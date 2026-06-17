@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>harmony — talk anywhere, instantly</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            base: { 950: '#0b0c10', 900: '#111319', 850: '#171a22', 800: '#1d212b', 700: '#2a2f3d' },
+            brand: { DEFAULT: '#7c6cff', 600: '#6a5af0', 400: '#9d90ff' },
+            accent: '#41d6a3',
+          },
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { background: radial-gradient(1200px 600px at 50% -10%, #1b1d2e 0%, #0b0c10 55%); }
+    .glow { box-shadow: 0 0 0 1px rgba(124,108,255,.25), 0 20px 60px -20px rgba(124,108,255,.45); }
+    .ring-soft { box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 font-sans antialiased">
+  <main class="min-h-screen flex flex-col items-center justify-center px-4">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 mb-8 select-none">
+      <div class="w-12 h-12 rounded-2xl bg-brand grid place-items-center glow">
+        <svg viewBox="0 0 24 24" class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0" />
+        </svg>
+      </div>
+      <h1 class="text-3xl font-extrabold tracking-tight text-white">harmony</h1>
+    </div>
+
+    <!-- Card -->
+    <div class="w-full max-w-md bg-base-900/80 backdrop-blur rounded-3xl p-7 ring-soft">
+      <h2 class="text-xl font-bold text-white">Hop into a room</h2>
+      <p class="text-sm text-slate-400 mt-1 mb-6">No account. No download. Just a name and a link.</p>
+
+      <div class="flex items-end gap-3">
+        <!-- avatar picker -->
+        <button type="button" onclick="document.getElementById('avatarFile').click()"
+                title="Add a photo"
+                class="group relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden ring-soft focus:outline-none focus:ring-2 focus:ring-brand transition">
+          <div id="avatarFallback" class="w-full h-full bg-gradient-to-br from-brand to-accent grid place-items-center text-base font-bold text-white">??</div>
+          <img id="avatarImg" alt="" class="absolute inset-0 w-full h-full object-cover hidden" />
+          <span class="absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover:opacity-100 transition">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </span>
+        </button>
+        <input id="avatarFile" type="file" accept="image/*" class="hidden" onchange="pickAvatar(event)" />
+
+        <div class="flex-1">
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Your name</label>
+          <input id="username" type="text" placeholder="pick a name" oninput="syncInitials()"
+                 class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
+        </div>
+      </div>
+
+      <button onclick="createRoom()"
+              class="mt-4 w-full bg-brand hover:bg-brand-600 active:scale-[.99] transition rounded-xl py-3 font-semibold text-white">
+        Create a room
+      </button>
+
+      <div class="flex items-center gap-3 my-5">
+        <div class="h-px flex-1 bg-white/10"></div>
+        <span class="text-xs text-slate-500">or join one</span>
+        <div class="h-px flex-1 bg-white/10"></div>
+      </div>
+
+      <div class="flex gap-2">
+        <input id="joinInput" type="text" placeholder="paste a room link or code"
+               onkeydown="if(event.key==='Enter')joinRoom()"
+               class="flex-1 bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
+        <button onclick="joinRoom()"
+                class="px-4 rounded-xl bg-base-700 hover:bg-base-800 ring-soft font-semibold text-white transition">Join</button>
+      </div>
+    </div>
+
+    <!-- Recent rooms -->
+    <div id="recentSection" class="w-full max-w-md mt-6 hidden">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 px-1">Recently joined</p>
+      <div id="recentList" class="space-y-1.5"></div>
+    </div>
+
+    <p class="text-xs text-slate-600 mt-8">peer-to-peer · end-to-end encrypted · no server</p>
+  </main>
+
+  <script type="module">
+    import { getMyName, setMyName, getMyAvatar, setMyAvatar, getRoomHistory, addRoomToHistory, initials } from './shared.js';
+
+    const initialsOf = n => (n.trim() || '??').slice(0,2).toUpperCase();
+
+    function syncInitials() {
+      document.getElementById('avatarFallback').textContent =
+        initialsOf(document.getElementById('username').value);
+    }
+    window.syncInitials = syncInitials;
+
+    // restore saved name + avatar
+    const savedName = getMyName();
+    if (savedName) {
+      document.getElementById('username').value = savedName;
+      syncInitials();
+    }
+    const savedAvatar = getMyAvatar();
+    if (savedAvatar) showAvatar(savedAvatar);
+
+    function showAvatar(dataUrl) {
+      const img = document.getElementById('avatarImg');
+      img.src = dataUrl;
+      img.classList.remove('hidden');
+      document.getElementById('avatarFallback').classList.add('hidden');
+    }
+
+    window.pickAvatar = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const S = 96, c = document.createElement('canvas');
+          c.width = c.height = S;
+          const ctx = c.getContext('2d');
+          const side = Math.min(img.width, img.height);
+          ctx.drawImage(img, (img.width-side)/2, (img.height-side)/2, side, side, 0, 0, S, S);
+          const dataUrl = c.toDataURL('image/jpeg', 0.85);
+          setMyAvatar(dataUrl);
+          showAvatar(dataUrl);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    function saveName() {
+      const name = document.getElementById('username').value.trim() || 'guest';
+      setMyName(name);
+      return name;
+    }
+
+    function extractRoomId(input) {
+      const trimmed = input.trim();
+      // bare UUID
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed))
+        return trimmed;
+      // URL with hash
+      try {
+        const url = new URL(trimmed);
+        if (url.hash.length > 1) return url.hash.slice(1);
+      } catch {}
+      // short code (anything non-empty)
+      if (trimmed.length > 0) return trimmed;
+      return null;
+    }
+
+    window.createRoom = function() {
+      saveName();
+      const id = crypto.randomUUID();
+      addRoomToHistory(id);
+      window.location = `room.html#${id}`;
+    };
+
+    window.joinRoom = function() {
+      const input = document.getElementById('joinInput').value;
+      const id = extractRoomId(input);
+      if (!id) return;
+      saveName();
+      addRoomToHistory(id);
+      window.location = `room.html#${id}`;
+    };
+
+    // render recent rooms from localStorage
+    const GRADIENTS = [
+      'from-brand to-accent', 'from-orange-400 to-pink-500', 'from-sky-400 to-indigo-500',
+      'from-emerald-400 to-teal-500', 'from-pink-500 to-brand', 'from-amber-400 to-orange-500',
+    ];
+
+    function renderRecent() {
+      const rooms = getRoomHistory();
+      const section = document.getElementById('recentSection');
+      const list = document.getElementById('recentList');
+      if (rooms.length === 0) { section.classList.add('hidden'); return; }
+      section.classList.remove('hidden');
+      list.innerHTML = '';
+      rooms.slice(0, 5).forEach((room, i) => {
+        const short = room.id.slice(0, 8);
+        const grad = GRADIENTS[i % GRADIENTS.length];
+        const ini = short.slice(0, 2).toUpperCase();
+        const ago = timeAgo(room.lastVisited);
+        list.insertAdjacentHTML('beforeend', `
+          <a href="room.html#${room.id}" class="flex items-center justify-between bg-base-900/60 hover:bg-base-850 ring-soft rounded-xl px-4 py-3 transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>
+              <div>
+                <div class="text-sm font-semibold text-white font-mono">${short}…</div>
+                <div class="text-xs text-slate-500">${ago}</div>
+              </div>
+            </div>
+            <span class="text-slate-600 group-hover:text-brand-400 transition">&rarr;</span>
+          </a>`);
+      });
+    }
+
+    function timeAgo(ts) {
+      const diff = Date.now() - ts;
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      const days = Math.floor(hrs / 24);
+      return `${days}d ago`;
+    }
+
+    renderRecent();
+  </script>
+</body>
+</html>

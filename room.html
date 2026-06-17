@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>harmony</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          base: { 950:'#0b0c10', 900:'#111319', 850:'#171a22', 800:'#1d212b', 700:'#2a2f3d' },
+          brand: { DEFAULT:'#7c6cff', 600:'#6a5af0', 400:'#9d90ff' },
+          accent:'#41d6a3',
+        },
+        fontFamily: { sans:['Inter','ui-sans-serif','system-ui','sans-serif'] },
+      }},
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { background:#0b0c10; }
+    .ring-soft { box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+    .speaking { box-shadow: 0 0 0 2px #41d6a3, 0 0 14px -2px #41d6a3; }
+    ::-webkit-scrollbar { width:10px; }
+    ::-webkit-scrollbar-thumb { background:#22273a; border-radius:9px; border:3px solid #0b0c10; }
+    @keyframes pulse-ring { 0%{transform:scale(.85);opacity:.7} 100%{transform:scale(1.6);opacity:0} }
+    .pulse::after { content:''; position:absolute; inset:0; border-radius:9999px; background:#41d6a3; animation:pulse-ring 1.4s ease-out infinite; }
+  </style>
+</head>
+<body class="h-screen overflow-hidden text-slate-200 font-sans antialiased">
+  <div class="flex h-full">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="w-64 shrink-0 bg-base-900 flex flex-col ring-soft">
+      <!-- room header -->
+      <div class="px-4 py-3.5 border-b border-white/5 flex items-center justify-between">
+        <div class="min-w-0">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Room</div>
+          <div id="roomTitle" class="font-bold text-white truncate font-mono text-sm"></div>
+        </div>
+        <button title="Copy invite link" onclick="copyLink()"
+                class="w-8 h-8 grid place-items-center rounded-lg bg-base-800 hover:bg-base-700 ring-soft transition text-slate-300">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        </button>
+      </div>
+
+      <!-- participants -->
+      <div class="flex-1 overflow-y-auto px-2 py-3">
+        <div id="voiceHeader" class="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">In room — 1</div>
+        <div id="peerList"></div>
+      </div>
+
+      <!-- voice control dock -->
+      <div class="p-2.5 bg-base-950/60 border-t border-white/5">
+        <!-- not-in-voice state -->
+        <div id="voiceJoinPanel">
+          <button onclick="joinVoice()" class="w-full flex items-center justify-center gap-2 bg-accent/20 hover:bg-accent/30 ring-soft rounded-lg py-2 text-sm font-semibold text-accent transition">
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+            Join voice
+          </button>
+        </div>
+        <!-- in-voice state (hidden initially) -->
+        <div id="voiceActivePanel" class="hidden">
+          <div class="flex items-center gap-2 mb-2 px-1">
+            <span class="w-2 h-2 rounded-full bg-accent"></span>
+            <span class="text-xs font-semibold text-accent">Voice connected</span>
+          </div>
+          <div class="flex gap-2">
+            <button id="micBtn" onclick="toggleMic()" class="flex-1 flex items-center justify-center gap-2 bg-base-800 hover:bg-base-700 ring-soft rounded-lg py-2 text-sm font-semibold text-white transition">
+              <svg id="micBtnIcon" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+              <span id="micBtnLabel">Mute</span>
+            </button>
+            <button onclick="leaveRoom()" title="Leave" class="px-3 grid place-items-center bg-rose-500/90 hover:bg-rose-500 rounded-lg text-white transition">
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 17l5-5-5-5M21 12H9M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ CHAT ============ -->
+    <section class="flex-1 flex flex-col min-w-0 bg-base-950">
+      <!-- top bar -->
+      <header class="h-14 shrink-0 flex items-center gap-3 px-5 border-b border-white/5 bg-base-900/40">
+        <span class="text-slate-500">#</span>
+        <span id="topTitle" class="font-bold text-white font-mono text-sm"></span>
+        <span class="text-slate-600">·</span>
+        <span id="peerCount" class="text-sm text-slate-400">1 here</span>
+        <div class="ml-auto flex items-center gap-2 text-xs text-slate-500">
+          <span class="w-2 h-2 rounded-full bg-accent"></span> end-to-end encrypted
+        </div>
+      </header>
+
+      <!-- messages -->
+      <div id="messages" class="flex-1 overflow-y-auto px-5 py-4 space-y-0.5">
+        <div id="emptyState" class="flex flex-col items-center justify-center h-full text-center">
+          <div class="w-16 h-16 rounded-2xl bg-brand/10 grid place-items-center mb-4">
+            <svg viewBox="0 0 24 24" class="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0" />
+            </svg>
+          </div>
+          <p class="text-slate-400 font-semibold">You're the first one here</p>
+          <p class="text-slate-500 text-sm mt-1">Share the link to invite others</p>
+        </div>
+      </div>
+
+      <!-- composer -->
+      <div class="px-5 pb-5">
+        <div class="relative">
+          <!-- emoji picker popover -->
+          <div id="emojiPanel" class="hidden absolute bottom-full mb-2 left-0 w-[320px] bg-base-850 ring-soft rounded-2xl p-3 shadow-2xl shadow-black/50">
+            <div id="emojiTabs" class="flex gap-1 mb-2.5"></div>
+            <div id="emojiGrid" class="grid grid-cols-8 gap-0.5 max-h-44 overflow-y-auto pr-1"></div>
+          </div>
+
+          <div class="flex items-end gap-2 bg-base-850 rounded-2xl ring-soft px-3 py-2 focus-within:ring-2 focus-within:ring-brand transition">
+            <button id="emojiToggle" onclick="toggleEmoji(event)" title="Emoji" class="shrink-0 w-9 h-9 grid place-items-center rounded-lg text-slate-400 hover:text-white hover:bg-base-700 transition">
+              <svg viewBox="0 0 24 24" class="w-[18px] h-[18px] pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 14.5s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg>
+            </button>
+            <input id="composer" type="text" autocomplete="off" placeholder="Message this room"
+                   onkeydown="if(event.key==='Enter')sendMessage()" oninput="refreshSend()"
+                   class="flex-1 bg-transparent outline-none text-white placeholder-slate-500 py-2" />
+            <button id="sendBtn" onclick="sendMessage()" title="Send"
+                    class="shrink-0 w-9 h-9 grid place-items-center rounded-lg text-slate-600 transition-all duration-150">
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- audio elements for peers go here -->
+  <div id="audioContainer" class="hidden"></div>
+
+  <script type="module">
+    import { joinRoom, selfId } from 'https://esm.sh/trystero@0.18.0/mqtt';
+    import {
+      APP_ID, RTC_CONFIG, gradientFor, initials, escapeHtml, now, isImageUrl,
+      getMyName, getMyAvatar, addRoomToHistory,
+    } from './shared.js';
+
+    // ── room ID from hash ──
+    const roomId = window.location.hash.slice(1);
+    if (!roomId) { window.location = 'index.html'; throw new Error('no room id'); }
+
+    const shortId = roomId.slice(0, 8) + '…';
+    document.getElementById('roomTitle').textContent = shortId;
+    document.getElementById('topTitle').textContent = shortId;
+    document.title = `${shortId} · harmony`;
+    addRoomToHistory(roomId);
+
+    // ── local identity ──
+    const myName = getMyName() || 'guest';
+    const myAvatar = getMyAvatar();
+
+    // ── state ──
+    const peers = new Map();
+    let micStream = null;
+    let muted = false;
+    let inVoice = false;
+
+    // ── join trystero room ──
+    const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, roomId);
+
+    // v0.18 API: makeAction returns [send, setOnComplete, setOnProgress]
+    const [sendPresence, onPresence] = room.makeAction('pres');
+    const [sendChat, onChat] = room.makeAction('chat');
+    const [sendMuteState, onMuteState] = room.makeAction('mute');
+
+    // ── presence ──
+    room.onPeerJoin(peerId => {
+      peers.set(peerId, { name: peerId.slice(0, 6), avatar: '', muted: false, inVoice: false });
+      sendPresence({ name: myName, avatar: myAvatar, inVoice }, peerId);
+      renderPeers();
+      addSystemMessage(`${peerId.slice(0, 6)} joined`, peerId);
+    });
+
+    onPresence(handlePresence);
+    function handlePresence(data, peerId) {
+      const peer = peers.get(peerId) || { muted: false, inVoice: false };
+      peer.name = data.name || peerId.slice(0, 6);
+      peer.avatar = data.avatar || '';
+      if (data.inVoice !== undefined) peer.inVoice = data.inVoice;
+      peers.set(peerId, peer);
+      renderPeers();
+      const sysEl = document.querySelector(`[data-join-id="${peerId}"]`);
+      if (sysEl) sysEl.textContent = `${peer.name} joined`;
+    }
+
+    room.onPeerLeave(peerId => {
+      const peer = peers.get(peerId);
+      const name = peer?.name || peerId.slice(0, 6);
+      peers.delete(peerId);
+      const audio = document.getElementById(`audio-${peerId}`);
+      if (audio) audio.remove();
+      renderPeers();
+      addSystemMessage(`${name} left`);
+    });
+
+    // ── chat ──
+    onChat((data, peerId) => {
+      const peer = peers.get(peerId);
+      const name = peer?.name || peerId.slice(0, 6);
+      const avatar = peer?.avatar || '';
+      const grad = gradientFor(peerId);
+      addChatMessage({ user: name, avatar, gradient: grad, text: data.text, time: now() });
+    });
+
+    // ── mute state ──
+    onMuteState((data, peerId) => {
+      const peer = peers.get(peerId);
+      if (peer) { peer.muted = data.muted; renderPeers(); }
+    });
+
+
+    // ── voice ──
+    room.onPeerStream((stream, peerId) => {
+      const peer = peers.get(peerId);
+      if (peer) peer.inVoice = true;
+
+      let audio = document.getElementById(`audio-${peerId}`);
+      if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = `audio-${peerId}`;
+        audio.autoplay = true;
+        document.getElementById('audioContainer').appendChild(audio);
+      }
+      audio.srcObject = stream;
+
+      try {
+        const ctx = new AudioContext();
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        const buf = new Uint8Array(analyser.frequencyBinCount);
+        function checkLevel() {
+          if (!peers.has(peerId)) return;
+          analyser.getByteFrequencyData(buf);
+          const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+          const el = document.getElementById(`peer-avatar-${peerId}`);
+          if (el) el.classList.toggle('speaking', avg > 15);
+          requestAnimationFrame(checkLevel);
+        }
+        checkLevel();
+      } catch {}
+
+      renderPeers();
+    });
+
+    // ── DOM references ──
+    const msgBox = document.getElementById('messages');
+    const emptyState = document.getElementById('emptyState');
+    const peerListEl = document.getElementById('peerList');
+
+    // ── render peer list ──
+    function renderPeers() {
+      const total = peers.size + 1;
+      document.getElementById('voiceHeader').textContent = `In room — ${total}`;
+      document.getElementById('peerCount').textContent = `${total} here`;
+
+      if (total > 1 && emptyState) emptyState.remove();
+
+      peerListEl.innerHTML = '';
+
+      // you first
+      const myGrad = 'from-brand to-accent';
+      const myIni = initials(myName);
+      const myAvatarHtml = myAvatar
+        ? `<img src="${myAvatar}" class="w-8 h-8 rounded-full object-cover" alt="" />`
+        : `<div class="w-8 h-8 rounded-full bg-gradient-to-br ${myGrad} grid place-items-center text-xs font-bold text-white">${myIni}</div>`;
+
+      const myMicSvg = muted
+        ? '<svg viewBox="0 0 24 24" class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/></svg>'
+        : (inVoice
+          ? '<svg viewBox="0 0 24 24" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>'
+          : '');
+
+      peerListEl.insertAdjacentHTML('beforeend', `
+        <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-base-850 transition">
+          <div class="relative">${myAvatarHtml}</div>
+          <span class="text-sm font-semibold text-white flex-1">${escapeHtml(myName)} <span class="text-slate-500 font-normal">(you)</span></span>
+          ${myMicSvg}
+        </div>`);
+
+      // peers
+      for (const [peerId, peer] of peers) {
+        const grad = gradientFor(peerId);
+        const ini = initials(peer.name);
+        const avatarHtml = peer.avatar
+          ? `<img src="${peer.avatar}" class="w-8 h-8 rounded-full object-cover" alt="" id="peer-avatar-${peerId}" />`
+          : `<div id="peer-avatar-${peerId}" class="w-8 h-8 rounded-full bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>`;
+
+        let micIcon = '';
+        if (peer.inVoice) {
+          micIcon = peer.muted
+            ? '<svg viewBox="0 0 24 24" class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/></svg>'
+            : '<svg viewBox="0 0 24 24" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
+        }
+
+        peerListEl.insertAdjacentHTML('beforeend', `
+          <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-base-850 transition">
+            <div class="relative">${avatarHtml}</div>
+            <span class="text-sm font-semibold text-white flex-1">${escapeHtml(peer.name)}</span>
+            ${micIcon}
+          </div>`);
+      }
+    }
+
+    // ── chat rendering ──
+    function addChatMessage({ user, avatar, gradient, text, time }) {
+      if (emptyState) emptyState.remove();
+
+      const isImg = isImageUrl(text);
+      const body = isImg
+        ? `<img src="${escapeHtml(text.trim())}" class="mt-1 rounded-xl max-w-[260px] ring-soft" alt="image" loading="lazy" />`
+        : `<div class="text-slate-200 leading-relaxed">${escapeHtml(text)}</div>`;
+
+      const grad = gradient || 'from-brand to-accent';
+      const ini = initials(user);
+      const avHtml = avatar
+        ? `<img src="${avatar}" class="w-9 h-9 mt-0.5 shrink-0 rounded-full object-cover" alt="" />`
+        : `<div class="w-9 h-9 mt-0.5 shrink-0 rounded-full bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>`;
+
+      msgBox.insertAdjacentHTML('beforeend', `
+        <div class="group flex gap-3 px-2 py-1 -mx-2 rounded-lg hover:bg-base-900/50 transition">
+          ${avHtml}
+          <div class="min-w-0">
+            <div class="flex items-baseline gap-2">
+              <span class="font-semibold text-white">${escapeHtml(user)}</span>
+              <span class="text-[11px] text-slate-500">${time}</span>
+            </div>
+            ${body}
+          </div>
+        </div>`);
+      msgBox.scrollTop = msgBox.scrollHeight;
+    }
+
+    function addSystemMessage(text, joinPeerId) {
+      if (emptyState) emptyState.remove();
+      const attr = joinPeerId ? ` data-join-id="${joinPeerId}"` : '';
+      msgBox.insertAdjacentHTML('beforeend', `
+        <div class="flex items-center gap-3 my-2">
+          <div class="h-px flex-1 bg-white/5"></div>
+          <span class="text-[11px] font-semibold text-slate-500"${attr}>${escapeHtml(text)}</span>
+          <div class="h-px flex-1 bg-white/5"></div>
+        </div>`);
+      msgBox.scrollTop = msgBox.scrollHeight;
+    }
+
+    // ── send message ──
+    window.sendMessage = function() {
+      const input = document.getElementById('composer');
+      const text = input.value.trim();
+      if (!text) return;
+      sendChat({ text });
+      addChatMessage({ user: myName, avatar: myAvatar, gradient: 'from-brand to-accent', text, time: now() });
+      input.value = '';
+      refreshSend();
+    };
+
+    // ── send button ghost-wake ──
+    window.refreshSend = function() {
+      const has = document.getElementById('composer').value.trim().length > 0;
+      const btn = document.getElementById('sendBtn');
+      btn.classList.toggle('text-slate-600', !has);
+      btn.classList.toggle('text-brand-400', has);
+      btn.classList.toggle('hover:text-brand', has);
+      btn.classList.toggle('-translate-y-0.5', has);
+    };
+
+    // ── voice ──
+    window.joinVoice = async function() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        addSystemMessage('Could not access microphone');
+        return;
+      }
+      inVoice = true;
+      room.addStream(micStream);
+      sendPresence({ name: myName, avatar: myAvatar, inVoice: true });
+      document.getElementById('voiceJoinPanel').classList.add('hidden');
+      document.getElementById('voiceActivePanel').classList.remove('hidden');
+      renderPeers();
+    };
+
+    window.toggleMic = function() {
+      if (!micStream) return;
+      muted = !muted;
+      micStream.getAudioTracks().forEach(t => t.enabled = !muted);
+      document.getElementById('micBtnLabel').textContent = muted ? 'Unmute' : 'Mute';
+      const muteIcon = '<line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/>';
+      const onIcon = '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
+      document.getElementById('micBtnIcon').innerHTML = muted ? muteIcon : onIcon;
+      document.getElementById('micBtn').classList.toggle('bg-rose-500/20', muted);
+      sendMuteState({ muted });
+      renderPeers();
+    };
+
+    // ── copy link ──
+    window.copyLink = function() {
+      navigator.clipboard.writeText(window.location.href).catch(() => {});
+    };
+
+    // ── leave ──
+    window.leaveRoom = function() {
+      cleanup();
+      window.location = 'index.html';
+    };
+
+    function cleanup() {
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      room.leave();
+    }
+    window.addEventListener('beforeunload', cleanup);
+
+    // ── emoji picker ──
+    const EMOJI = {
+      '😀': '😀 😃 😄 😁 😆 😅 😂 🤣 🙂 😊 😇 😍 🥰 😘 😜 🤪 😎 🤩 🥳 😏 😴 🤔 🫠 😭 😤 😡 🥹 😳 🤯 🥲'.split(' '),
+      '👋': '👋 🤚 ✋ 🖖 👌 🤏 ✌️ 🤞 🫰 🤟 🤘 👈 👉 👆 👇 👍 👎 ✊ 👊 🙌 👏 🙏 💪 🫡 🤝 🫶'.split(' '),
+      '❤️': '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💖 💗 💓 💞 💕 💔 ❣️ ✨ ⭐ 🔥 💯 🎉 🎊 🥂 💫'.split(' '),
+      '🐱': '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🦄 🐝 🦋 🐢 🐙 🦀 🦖'.split(' '),
+      '🍜': '🍜 🍕 🍔 🌮 🍣 🍦 🍩 🍪 🍰 🧋 🍺 🍷 🍿 🍎 🍓 🥑 🥐 🧀 🥩 🍳 ☕ 🥤 🍫 🍯'.split(' '),
+      '⚽': '⚽ 🏀 🎮 🎧 🎸 🎲 🎯 🏆 🥁 🎤 🎬 📸 🚀 🌙 🌊 🏝️ 🎁 💡 ✈️ 🎵 🕹️ 🛹 ⛺ 🎈'.split(' '),
+    };
+    const emojiPanel = document.getElementById('emojiPanel');
+    const emojiTabsEl = document.getElementById('emojiTabs');
+    const emojiGrid = document.getElementById('emojiGrid');
+
+    Object.keys(EMOJI).forEach((tab, i) => {
+      const b = document.createElement('button');
+      b.textContent = tab;
+      b.className = 'w-8 h-8 rounded-lg text-lg grid place-items-center hover:bg-base-700 transition';
+      b.onclick = () => renderEmojiTab(tab, b);
+      emojiTabsEl.appendChild(b);
+      if (i === 0) setTimeout(() => renderEmojiTab(tab, b), 0);
+    });
+
+    function renderEmojiTab(tab, btn) {
+      [...emojiTabsEl.children].forEach(c => c.classList.remove('bg-base-700', 'ring-soft'));
+      btn.classList.add('bg-base-700', 'ring-soft');
+      emojiGrid.innerHTML = '';
+      EMOJI[tab].forEach(e => {
+        const cell = document.createElement('button');
+        cell.textContent = e;
+        cell.className = 'w-9 h-9 rounded-lg text-xl grid place-items-center hover:bg-base-700 transition';
+        cell.onclick = () => {
+          document.getElementById('composer').value += e;
+          document.getElementById('composer').focus();
+          refreshSend();
+        };
+        emojiGrid.appendChild(cell);
+      });
+    }
+
+    const emojiBtn = document.getElementById('emojiToggle');
+    function setEmojiActive(open) {
+      emojiBtn.classList.toggle('bg-base-700', open);
+      emojiBtn.classList.toggle('text-white', open);
+      emojiBtn.classList.toggle('text-slate-400', !open);
+    }
+
+    window.toggleEmoji = function(ev) {
+      ev.stopPropagation();
+      const opening = emojiPanel.classList.toggle('hidden') === false;
+      setEmojiActive(opening);
+    };
+
+    document.addEventListener('click', e => {
+      if (!emojiPanel.classList.contains('hidden') &&
+          !emojiPanel.contains(e.target) &&
+          e.target.id !== 'emojiToggle') {
+        emojiPanel.classList.add('hidden');
+        setEmojiActive(false);
+      }
+    });
+
+    // ── init ──
+    renderPeers();
+  </script>
+</body>
+</html>
