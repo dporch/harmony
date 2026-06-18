@@ -12,7 +12,22 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
+    {
+      name: 'chromium',
+      use: {
+        browserName: 'chromium',
+        launchOptions: {
+          args: [
+            // synthesize a fake mic (a tone) so getUserMedia works headless
+            '--use-fake-device-for-media-stream',
+            // auto-accept the mic permission prompt
+            '--use-fake-ui-for-media-stream',
+            // let the received audio + AudioContext start without a user gesture
+            '--autoplay-policy=no-user-gesture-required',
+          ],
+        },
+      },
+    },
   ],
   webServer: {
     command: 'python3 -m http.server 8000',

@@ -36,25 +36,34 @@
     <!-- ============ SIDEBAR ============ -->
     <aside class="w-64 shrink-0 bg-base-900 flex flex-col ring-soft">
       <!-- room header -->
-      <div class="px-4 py-3.5 border-b border-white/5 flex items-center justify-between">
-        <div class="min-w-0">
+      <div class="px-4 py-3.5 border-b border-white/5 flex items-center gap-2.5">
+        <div id="roomIcon" class="shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gradient-to-br from-sky-400 to-indigo-500 grid place-items-center text-white">
+          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+        </div>
+        <div class="min-w-0 flex-1">
           <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Room</div>
-          <div id="roomTitle" class="font-bold text-white truncate font-mono text-sm"></div>
+          <div id="roomTitle" class="font-bold text-white truncate text-sm"></div>
         </div>
         <button title="Copy invite link" onclick="copyLink()"
-                class="w-8 h-8 grid place-items-center rounded-lg bg-base-800 hover:bg-base-700 ring-soft transition text-slate-300">
+                class="shrink-0 w-8 h-8 grid place-items-center rounded-lg bg-base-800 hover:bg-base-700 ring-soft transition text-slate-300">
           <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
         </button>
       </div>
 
       <!-- participants -->
-      <div class="flex-1 overflow-y-auto px-2 py-3">
-        <div id="voiceHeader" class="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">In room — 1</div>
-        <div id="peerList"></div>
+      <div id="peerList" class="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+        <div id="voiceChatSection">
+          <div id="voiceChatHeader" class="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Voice chat — 0</div>
+          <div id="voiceChatList"></div>
+        </div>
+        <div>
+          <div id="lurkingHeader" class="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Lurking — 1</div>
+          <div id="lurkingList"></div>
+        </div>
       </div>
 
       <!-- voice control dock -->
-      <div class="p-2.5 bg-base-950/60 border-t border-white/5">
+      <div class="p-2.5 bg-base-950/60 border-t border-white/5 space-y-2">
         <!-- not-in-voice state -->
         <div id="voiceJoinPanel">
           <button onclick="joinVoice()" class="w-full flex items-center justify-center gap-2 bg-accent/20 hover:bg-accent/30 ring-soft rounded-lg py-2 text-sm font-semibold text-accent transition">
@@ -73,10 +82,20 @@
               <svg id="micBtnIcon" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
               <span id="micBtnLabel">Mute</span>
             </button>
-            <button onclick="leaveRoom()" title="Leave" class="px-3 grid place-items-center bg-rose-500/90 hover:bg-rose-500 rounded-lg text-white transition">
-              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 17l5-5-5-5M21 12H9M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/></svg>
+            <button onclick="leaveVoice()" title="Leave voice" class="px-3 grid place-items-center bg-base-800 hover:bg-rose-500/20 ring-soft rounded-lg text-slate-400 hover:text-rose-300 transition">
+              <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-3.33-2.67m-2.67-3.34a19.79 19.79 0 01-3.07-8.63A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
             </button>
           </div>
+        </div>
+        <!-- always-visible leave room + settings -->
+        <div class="flex gap-2">
+          <button onclick="leaveRoom()" class="flex-1 flex items-center justify-center gap-2 bg-base-800 hover:bg-rose-500/20 ring-soft rounded-lg py-2 text-sm font-semibold text-slate-400 hover:text-rose-300 transition">
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 17l5-5-5-5M21 12H9M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/></svg>
+            Leave room
+          </button>
+          <button onclick="openSettings()" title="Settings" class="px-3 grid place-items-center bg-base-800 hover:bg-base-700 ring-soft rounded-lg text-slate-400 hover:text-white transition">
+            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </button>
         </div>
       </div>
     </aside>
@@ -136,11 +155,48 @@
   <!-- audio elements for peers go here -->
   <div id="audioContainer" class="hidden"></div>
 
+  <!-- ============ SETTINGS MODAL ============ -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="w-full max-w-sm bg-base-900 ring-soft rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold text-white">Settings</h2>
+        <button onclick="closeSettings()" title="Close" class="w-8 h-8 grid place-items-center rounded-lg text-slate-400 hover:text-white hover:bg-base-800 transition">
+          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="flex items-end gap-3">
+        <button type="button" onclick="document.getElementById('settingsAvatarFile').click()" title="Change photo"
+                class="group relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden ring-soft focus:outline-none focus:ring-2 focus:ring-brand transition">
+          <div id="settingsAvatarFallback" class="w-full h-full bg-gradient-to-br from-brand to-accent grid place-items-center text-base font-bold text-white">??</div>
+          <img id="settingsAvatarImg" alt="" class="absolute inset-0 w-full h-full object-cover hidden" />
+          <span class="absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover:opacity-100 transition">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </span>
+        </button>
+        <input id="settingsAvatarFile" type="file" accept="image/*" class="hidden" onchange="pickSettingsAvatar(event)" />
+
+        <div class="flex-1">
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Username</label>
+          <input id="settingsName" type="text" placeholder="your name"
+                 onkeydown="if(event.key==='Enter')saveSettings()"
+                 class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
+        </div>
+      </div>
+
+      <div class="flex gap-2 mt-6">
+        <button onclick="closeSettings()" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
+        <button onclick="saveSettings()" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { joinRoom, selfId } from 'https://esm.sh/trystero@0.18.0/mqtt';
     import {
       APP_ID, RTC_CONFIG, gradientFor, initials, escapeHtml, now, isImageUrl,
-      getMyName, getMyAvatar, addRoomToHistory,
+      getMyName, setMyName, getMyAvatar, setMyAvatar,
+      addRoomToHistory, getRoomMeta, setRoomMeta,
     } from './shared.js';
 
     // ── room ID from hash ──
@@ -148,14 +204,26 @@
     if (!roomId) { window.location = 'index.html'; throw new Error('no room id'); }
 
     const shortId = roomId.slice(0, 8) + '…';
-    document.getElementById('roomTitle').textContent = shortId;
-    document.getElementById('topTitle').textContent = shortId;
-    document.title = `${shortId} · harmony`;
+
+    // ── room identity (name + image, shared P2P) ──
+    let roomMeta = { name: '', image: '' };
+    function applyRoomMeta(meta) {
+      roomMeta = { name: meta.name || '', image: meta.image || '' };
+      const title = roomMeta.name || shortId;
+      document.getElementById('roomTitle').textContent = title;
+      document.getElementById('topTitle').textContent = title;
+      document.title = `${title} · harmony`;
+      if (roomMeta.image) {
+        document.getElementById('roomIcon').innerHTML =
+          `<img src="${escapeHtml(roomMeta.image)}" class="w-full h-full object-cover" alt="" />`;
+      }
+    }
+    applyRoomMeta(getRoomMeta(roomId));
     addRoomToHistory(roomId);
 
-    // ── local identity ──
-    const myName = getMyName() || 'guest';
-    const myAvatar = getMyAvatar();
+    // ── local identity ── (mutable: editable via settings)
+    let myName = getMyName() || 'guest';
+    let myAvatar = getMyAvatar();
 
     // ── state ──
     const peers = new Map();
@@ -170,11 +238,20 @@
     const [sendPresence, onPresence] = room.makeAction('pres');
     const [sendChat, onChat] = room.makeAction('chat');
     const [sendMuteState, onMuteState] = room.makeAction('mute');
+    const [sendMeta, onMeta] = room.makeAction('meta');
+
+    // adopt the room name/image whoever already has it shares
+    onMeta(data => {
+      if (!data || (!data.name && !data.image)) return;
+      applyRoomMeta(data);
+      setRoomMeta(roomId, roomMeta);
+    });
 
     // ── presence ──
     room.onPeerJoin(peerId => {
       peers.set(peerId, { name: peerId.slice(0, 6), avatar: '', muted: false, inVoice: false });
       sendPresence({ name: myName, avatar: myAvatar, inVoice }, peerId);
+      if (roomMeta.name || roomMeta.image) sendMeta(roomMeta, peerId);
       renderPeers();
       addSystemMessage(`${peerId.slice(0, 6)} joined`, peerId);
     });
@@ -255,37 +332,42 @@
     // ── DOM references ──
     const msgBox = document.getElementById('messages');
     const emptyState = document.getElementById('emptyState');
-    const peerListEl = document.getElementById('peerList');
+    const voiceChatList = document.getElementById('voiceChatList');
+    const lurkingList = document.getElementById('lurkingList');
+
+    // ── mic status icons ──
+    const MIC_ON = '<svg viewBox="0 0 24 24" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
+    const MIC_MUTED = '<svg viewBox="0 0 24 24" class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/></svg>';
+
+    function rowHtml(avatarHtml, nameHtml, micIcon) {
+      return `
+        <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-base-850 transition">
+          <div class="relative">${avatarHtml}</div>
+          <span class="text-sm font-semibold text-white flex-1">${nameHtml}</span>
+          ${micIcon}
+        </div>`;
+    }
 
     // ── render peer list ──
     function renderPeers() {
       const total = peers.size + 1;
-      document.getElementById('voiceHeader').textContent = `In room — ${total}`;
       document.getElementById('peerCount').textContent = `${total} here`;
-
       if (total > 1 && emptyState) emptyState.remove();
 
-      peerListEl.innerHTML = '';
+      const voiceRows = [];
+      const lurkRows = [];
 
-      // you first
-      const myGrad = 'from-brand to-accent';
+      // you
       const myIni = initials(myName);
       const myAvatarHtml = myAvatar
         ? `<img src="${myAvatar}" class="w-8 h-8 rounded-full object-cover" alt="" />`
-        : `<div class="w-8 h-8 rounded-full bg-gradient-to-br ${myGrad} grid place-items-center text-xs font-bold text-white">${myIni}</div>`;
-
-      const myMicSvg = muted
-        ? '<svg viewBox="0 0 24 24" class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/></svg>'
-        : (inVoice
-          ? '<svg viewBox="0 0 24 24" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>'
-          : '');
-
-      peerListEl.insertAdjacentHTML('beforeend', `
-        <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-base-850 transition">
-          <div class="relative">${myAvatarHtml}</div>
-          <span class="text-sm font-semibold text-white flex-1">${escapeHtml(myName)} <span class="text-slate-500 font-normal">(you)</span></span>
-          ${myMicSvg}
-        </div>`);
+        : `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-accent grid place-items-center text-xs font-bold text-white">${myIni}</div>`;
+      const myNameHtml = `${escapeHtml(myName)} <span class="text-slate-500 font-normal">(you)</span>`;
+      if (inVoice) {
+        voiceRows.push(rowHtml(myAvatarHtml, myNameHtml, muted ? MIC_MUTED : MIC_ON));
+      } else {
+        lurkRows.push(rowHtml(myAvatarHtml, myNameHtml, ''));
+      }
 
       // peers
       for (const [peerId, peer] of peers) {
@@ -294,21 +376,19 @@
         const avatarHtml = peer.avatar
           ? `<img src="${peer.avatar}" class="w-8 h-8 rounded-full object-cover" alt="" id="peer-avatar-${peerId}" />`
           : `<div id="peer-avatar-${peerId}" class="w-8 h-8 rounded-full bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>`;
-
-        let micIcon = '';
+        const nameHtml = escapeHtml(peer.name);
         if (peer.inVoice) {
-          micIcon = peer.muted
-            ? '<svg viewBox="0 0 24 24" class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/></svg>'
-            : '<svg viewBox="0 0 24 24" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
+          voiceRows.push(rowHtml(avatarHtml, nameHtml, peer.muted ? MIC_MUTED : MIC_ON));
+        } else {
+          lurkRows.push(rowHtml(avatarHtml, nameHtml, ''));
         }
-
-        peerListEl.insertAdjacentHTML('beforeend', `
-          <div class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-base-850 transition">
-            <div class="relative">${avatarHtml}</div>
-            <span class="text-sm font-semibold text-white flex-1">${escapeHtml(peer.name)}</span>
-            ${micIcon}
-          </div>`);
       }
+
+      document.getElementById('voiceChatHeader').textContent = `Voice chat — ${voiceRows.length}`;
+      voiceChatList.innerHTML = voiceRows.join('');
+
+      document.getElementById('lurkingHeader').textContent = `Lurking — ${lurkRows.length}`;
+      lurkingList.innerHTML = lurkRows.join('');
     }
 
     // ── chat rendering ──
@@ -402,6 +482,26 @@
       renderPeers();
     };
 
+    window.leaveVoice = function() {
+      if (!inVoice) return;
+      if (micStream) {
+        room.removeStream(micStream);
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+      }
+      inVoice = false;
+      muted = false;
+      sendPresence({ name: myName, avatar: myAvatar, inVoice: false });
+      // reset mute button to its default look
+      document.getElementById('micBtnLabel').textContent = 'Mute';
+      document.getElementById('micBtnIcon').innerHTML = '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
+      document.getElementById('micBtn').classList.remove('bg-rose-500/20');
+      // swap dock back to the join state
+      document.getElementById('voiceActivePanel').classList.add('hidden');
+      document.getElementById('voiceJoinPanel').classList.remove('hidden');
+      renderPeers();
+    };
+
     // ── copy link ──
     window.copyLink = function() {
       navigator.clipboard.writeText(window.location.href).catch(() => {});
@@ -418,6 +518,70 @@
       room.leave();
     }
     window.addEventListener('beforeunload', cleanup);
+
+    // ── settings (change name / avatar) ──
+    let settingsAvatar = null; // staged avatar while modal is open
+
+    window.openSettings = function() {
+      settingsAvatar = myAvatar;
+      document.getElementById('settingsName').value = myName;
+      const img = document.getElementById('settingsAvatarImg');
+      const fb = document.getElementById('settingsAvatarFallback');
+      if (myAvatar) {
+        img.src = myAvatar;
+        img.classList.remove('hidden');
+        fb.classList.add('hidden');
+      } else {
+        img.classList.add('hidden');
+        fb.classList.remove('hidden');
+        fb.textContent = initials(myName);
+      }
+      document.getElementById('settingsModal').classList.remove('hidden');
+      document.getElementById('settingsName').focus();
+    };
+
+    window.closeSettings = function() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    };
+
+    window.pickSettingsAvatar = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => {
+          const S = 96, c = document.createElement('canvas');
+          c.width = c.height = S;
+          const ctx = c.getContext('2d');
+          const side = Math.min(image.width, image.height);
+          ctx.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, S, S);
+          settingsAvatar = c.toDataURL('image/jpeg', 0.85);
+          const img = document.getElementById('settingsAvatarImg');
+          img.src = settingsAvatar;
+          img.classList.remove('hidden');
+          document.getElementById('settingsAvatarFallback').classList.add('hidden');
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.saveSettings = function() {
+      myName = document.getElementById('settingsName').value.trim() || 'guest';
+      myAvatar = settingsAvatar;
+      setMyName(myName);
+      setMyAvatar(myAvatar);
+      // let everyone in the room see the new name / photo right away
+      sendPresence({ name: myName, avatar: myAvatar, inVoice });
+      renderPeers();
+      closeSettings();
+    };
+
+    // close on backdrop click
+    document.getElementById('settingsModal').addEventListener('click', e => {
+      if (e.target.id === 'settingsModal') closeSettings();
+    });
 
     // ── emoji picker ──
     const EMOJI = {

@@ -60,8 +60,30 @@
         <input id="avatarFile" type="file" accept="image/*" class="hidden" onchange="pickAvatar(event)" />
 
         <div class="flex-1">
-          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Your name</label>
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Username</label>
           <input id="username" type="text" placeholder="pick a name" oninput="syncInitials()"
+                 class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
+        </div>
+      </div>
+
+      <div class="flex items-end gap-3 mt-4">
+        <!-- room icon picker -->
+        <button type="button" onclick="document.getElementById('roomImgFile').click()"
+                title="Add a room photo"
+                class="group relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden ring-soft focus:outline-none focus:ring-2 focus:ring-brand transition">
+          <div id="roomImgFallback" class="w-full h-full bg-gradient-to-br from-sky-400 to-indigo-500 grid place-items-center text-white">
+            <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+          </div>
+          <img id="roomImg" alt="" class="absolute inset-0 w-full h-full object-cover hidden" />
+          <span class="absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover:opacity-100 transition">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </span>
+        </button>
+        <input id="roomImgFile" type="file" accept="image/*" class="hidden" onchange="pickRoomImg(event)" />
+
+        <div class="flex-1">
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Room name</label>
+          <input id="roomName" type="text" placeholder="name your room" onkeydown="if(event.key==='Enter')createRoom()"
                  class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
         </div>
       </div>
@@ -96,7 +118,7 @@
   </main>
 
   <script type="module">
-    import { getMyName, setMyName, getMyAvatar, setMyAvatar, getRoomHistory, addRoomToHistory, initials } from './shared.js';
+    import { getMyName, setMyName, getMyAvatar, setMyAvatar, getRoomHistory, addRoomToHistory, initials, escapeHtml } from './shared.js';
 
     const initialsOf = n => (n.trim() || '??').slice(0,2).toUpperCase();
 
@@ -143,6 +165,31 @@
       reader.readAsDataURL(file);
     };
 
+    // ── room icon picker ──
+    let roomImgData = '';
+    window.pickRoomImg = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => {
+          const S = 96, c = document.createElement('canvas');
+          c.width = c.height = S;
+          const ctx = c.getContext('2d');
+          const side = Math.min(image.width, image.height);
+          ctx.drawImage(image, (image.width-side)/2, (image.height-side)/2, side, side, 0, 0, S, S);
+          roomImgData = c.toDataURL('image/jpeg', 0.85);
+          const img = document.getElementById('roomImg');
+          img.src = roomImgData;
+          img.classList.remove('hidden');
+          document.getElementById('roomImgFallback').classList.add('hidden');
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
     function saveName() {
       const name = document.getElementById('username').value.trim() || 'guest';
       setMyName(name);
@@ -167,7 +214,8 @@
     window.createRoom = function() {
       saveName();
       const id = crypto.randomUUID();
-      addRoomToHistory(id);
+      const name = document.getElementById('roomName').value.trim();
+      addRoomToHistory(id, { name, image: roomImgData });
       window.location = `room.html#${id}`;
     };
 
@@ -196,18 +244,24 @@
       rooms.slice(0, 5).forEach((room, i) => {
         const short = room.id.slice(0, 8);
         const grad = GRADIENTS[i % GRADIENTS.length];
-        const ini = short.slice(0, 2).toUpperCase();
         const ago = timeAgo(room.lastVisited);
+        const label = room.name || `${short}…`;
+        const ini = escapeHtml((room.name || short).slice(0, 2).toUpperCase());
+        const iconHtml = room.image
+          ? `<img src="${escapeHtml(room.image)}" class="w-8 h-8 rounded-lg object-cover" alt="" />`
+          : `<div class="w-8 h-8 rounded-lg bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>`;
+        const labelCls = room.name ? 'text-sm font-semibold text-white truncate' : 'text-sm font-semibold text-white font-mono';
+        const subtitle = room.name ? `${short}… · ${ago}` : ago;
         list.insertAdjacentHTML('beforeend', `
           <a href="room.html#${room.id}" class="flex items-center justify-between bg-base-900/60 hover:bg-base-850 ring-soft rounded-xl px-4 py-3 transition group">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-lg bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>
-              <div>
-                <div class="text-sm font-semibold text-white font-mono">${short}…</div>
-                <div class="text-xs text-slate-500">${ago}</div>
+            <div class="flex items-center gap-3 min-w-0">
+              ${iconHtml}
+              <div class="min-w-0">
+                <div class="${labelCls}">${escapeHtml(label)}</div>
+                <div class="text-xs text-slate-500">${subtitle}</div>
               </div>
             </div>
-            <span class="text-slate-600 group-hover:text-brand-400 transition">&rarr;</span>
+            <span class="shrink-0 text-slate-600 group-hover:text-brand-400 transition">&rarr;</span>
           </a>`);
       });
     }

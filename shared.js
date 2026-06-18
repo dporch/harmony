@@ -71,9 +71,24 @@ export function getRoomHistory() {
   catch { return []; }
 }
 
-export function addRoomToHistory(id) {
+export function addRoomToHistory(id, meta = {}) {
+  const existing = getRoomHistory().find(r => r.id === id) || {};
   const rooms = getRoomHistory().filter(r => r.id !== id);
-  rooms.unshift({ id, lastVisited: Date.now() });
+  rooms.unshift({
+    id,
+    name: meta.name ?? existing.name ?? '',
+    image: meta.image ?? existing.image ?? '',
+    lastVisited: Date.now(),
+  });
   if (rooms.length > 20) rooms.length = 20;
   localStorage.setItem('harmony:rooms', JSON.stringify(rooms));
+}
+
+export function getRoomMeta(id) {
+  const room = getRoomHistory().find(r => r.id === id);
+  return { name: room?.name || '', image: room?.image || '' };
+}
+
+export function setRoomMeta(id, meta) {
+  addRoomToHistory(id, meta);
 }
