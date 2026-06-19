@@ -269,7 +269,7 @@
     // ── presence ──
     room.onPeerJoin(peerId => {
       peers.set(peerId, { name: peerId.slice(0, 6), avatar: '', muted: false, inVoice: false });
-      sendPresence({ name: myName, avatar: myAvatar, inVoice }, peerId);
+      sendPresence({ name: myName, avatar: myAvatar, inVoice, muted }, peerId);
       if (roomMeta.name || roomMeta.image) sendMeta(roomMeta, peerId);
       // streams only reach peers present when addStream was called, so
       // re-send our mic to anyone who joins after we're already in voice
@@ -284,6 +284,7 @@
       peer.name = data.name || peerId.slice(0, 6);
       peer.avatar = data.avatar || '';
       if (data.inVoice !== undefined) peer.inVoice = data.inVoice;
+      if (data.muted !== undefined) peer.muted = data.muted;
       peers.set(peerId, peer);
       renderPeers();
       const sysEl = document.querySelector(`[data-join-id="${peerId}"]`);
@@ -294,6 +295,7 @@
       const peer = peers.get(peerId);
       const name = peer?.name || peerId.slice(0, 6);
       peers.delete(peerId);
+      stopMeter(peerId);
       const audio = document.getElementById(`audio-${peerId}`);
       if (audio) audio.remove();
       renderPeers();
@@ -317,6 +319,57 @@
 
 
     // ── voice ──
+    // one shared AudioContext for all speaking-level meters; creating one per
+    // stream leaks them and browsers cap the number you can have open
+    let audioCtx = null;
+    const meters = new Map(); // peerId -> { source, raf }
+
+    function stopMeter(peerId) {
+      const m = meters.get(peerId);
+      if (!m) return;
+      cancelAnimationFrame(m.raf);
+      try { m.source.disconnect(); } catch {}
+      meters.delete(peerId);
+      document.getElementById(`peer-avatar-${peerId}`)?.classList.remove('speaking');
+    }
+
+    function startMeter(peerId, stream) {
+      stopMeter(peerId); // tear down any prior meter for this peer (renegotiation)
+      try {
+        if (!audioCtx) audioCtx = new AudioContext();
+      } catch { return; }
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      const m = { source, raf: 0 };
+      meters.set(peerId, m);
+      (function checkLevel() {
+        // stop if the peer left or this meter was superseded by a newer one
+        if (meters.get(peerId) !== m) return;
+        analyser.getByteFrequencyData(buf);
+        const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+        document.getElementById(`peer-avatar-${peerId}`)?.classList.toggle('speaking', avg > 15);
+        m.raf = requestAnimationFrame(checkLevel);
+      })();
+    }
+
+    // browsers can block autoplay until the user interacts; recover gracefully
+    let audioUnblockArmed = false;
+    function armAudioUnblock() {
+      if (audioUnblockArmed) return;
+      audioUnblockArmed = true;
+      addSystemMessage('Audio is blocked — click anywhere to enable sound');
+      const resume = () => {
+        document.removeEventListener('click', resume);
+        audioUnblockArmed = false;
+        audioCtx?.resume?.();
+        document.querySelectorAll('#audioContainer audio').forEach(a => a.play?.().catch(() => {}));
+      };
+      document.addEventListener('click', resume);
+    }
+
     room.onPeerStream((stream, peerId) => {
       const peer = peers.get(peerId);
       if (peer) peer.inVoice = true;
@@ -330,25 +383,9 @@
       }
       audio.srcObject = stream;
       if (speakerId && audio.setSinkId) audio.setSinkId(speakerId).catch(() => {});
+      audio.play?.().catch(armAudioUnblock);
 
-      try {
-        const ctx = new AudioContext();
-        const src = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        src.connect(analyser);
-        const buf = new Uint8Array(analyser.frequencyBinCount);
-        function checkLevel() {
-          if (!peers.has(peerId)) return;
-          analyser.getByteFrequencyData(buf);
-          const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
-          const el = document.getElementById(`peer-avatar-${peerId}`);
-          if (el) el.classList.toggle('speaking', avg > 15);
-          requestAnimationFrame(checkLevel);
-        }
-        checkLevel();
-      } catch {}
-
+      startMeter(peerId, stream);
       renderPeers();
     });
 
@@ -477,18 +514,27 @@
     };
 
     // ── voice ──
+    // grab the saved mic, but fall back to the default if it's gone (unplugged,
+    // different machine) so a stale device id can't lock you out of voice
+    async function getMic() {
+      if (!micId) return navigator.mediaDevices.getUserMedia({ audio: true });
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: micId } } });
+      } catch {
+        return navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+    }
+
     window.joinVoice = async function() {
       try {
-        micStream = await navigator.mediaDevices.getUserMedia({
-          audio: micId ? { deviceId: { exact: micId } } : true,
-        });
+        micStream = await getMic();
       } catch (err) {
         addSystemMessage('Could not access microphone');
         return;
       }
       inVoice = true;
       room.addStream(micStream);
-      sendPresence({ name: myName, avatar: myAvatar, inVoice: true });
+      sendPresence({ name: myName, avatar: myAvatar, inVoice: true, muted });
       document.getElementById('voiceJoinPanel').classList.add('hidden');
       document.getElementById('voiceActivePanel').classList.remove('hidden');
       renderPeers();
@@ -516,7 +562,7 @@
       }
       inVoice = false;
       muted = false;
-      sendPresence({ name: myName, avatar: myAvatar, inVoice: false });
+      sendPresence({ name: myName, avatar: myAvatar, inVoice: false, muted: false });
       // reset mute button to its default look
       document.getElementById('micBtnLabel').textContent = 'Mute';
       document.getElementById('micBtnIcon').innerHTML = '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
@@ -638,7 +684,7 @@
       if (micChanged && inVoice) await swapMic();
 
       // let everyone in the room see the new name / photo right away
-      sendPresence({ name: myName, avatar: myAvatar, inVoice });
+      sendPresence({ name: myName, avatar: myAvatar, inVoice, muted });
       renderPeers();
       closeSettings();
     };
@@ -646,9 +692,7 @@
     async function swapMic() {
       let next;
       try {
-        next = await navigator.mediaDevices.getUserMedia({
-          audio: micId ? { deviceId: { exact: micId } } : true,
-        });
+        next = await getMic();
       } catch {
         addSystemMessage('Could not switch to the selected microphone');
         return;

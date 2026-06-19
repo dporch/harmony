@@ -264,6 +264,78 @@ test.describe('P2P voice between two users', () => {
     await contextA.close();
     await contextB.close();
   });
+
+  // Regression: streams only reach peers connected when addStream is called, so
+  // a peer joining *after* someone is already in voice must still receive them.
+  test('a peer who joins after alice is in voice still hears her', async ({ browser }) => {
+    test.setTimeout(120_000);
+
+    const contextA = await browser.newContext({ permissions: ['microphone'] });
+    const contextB = await browser.newContext({ permissions: ['microphone'] });
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+
+    // Alice creates a room and joins voice while she is alone in it
+    await pageA.goto('/index.html');
+    await pageA.locator('#username').fill('alice');
+    await pageA.locator('button', { hasText: 'Create a room' }).click();
+    await expect(pageA).toHaveURL(/room\.html#/);
+    const roomId = new URL(pageA.url()).hash.slice(1);
+
+    // wait for the room module to wire up before clicking the inline handler
+    await pageA.waitForFunction(() => typeof window.joinVoice === 'function');
+    await pageA.locator('button', { hasText: 'Join voice' }).click();
+    await expect(pageA.locator('#voiceActivePanel')).toBeVisible();
+
+    // Only now does Bob join the room — after Alice's addStream already happened
+    await pageB.goto('/index.html');
+    await pageB.locator('#username').fill('bob');
+    await pageB.locator('#joinInput').fill(roomId);
+    await pageB.locator('button', { hasText: 'Join' }).click();
+    await expect(pageB).toHaveURL(new RegExp(`room\\.html#${roomId}`));
+
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 30_000 });
+
+    // Bob must still receive Alice's audio even though he joined late
+    const bobAudio = pageB.locator('#audioContainer audio');
+    await expect(bobAudio).toHaveCount(1, { timeout: 30_000 });
+
+    const peakDeviation = await pageB.evaluate(async () => {
+      const audio = document.querySelector('#audioContainer audio');
+      const stream = audio && audio.srcObject;
+      if (!stream || stream.getAudioTracks().length === 0) return -1;
+
+      const ctx = new AudioContext();
+      await ctx.resume();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+
+      const buf = new Uint8Array(analyser.fftSize);
+      let peak = 0;
+      const start = performance.now();
+      await new Promise(resolve => {
+        const tick = () => {
+          analyser.getByteTimeDomainData(buf);
+          for (const v of buf) {
+            const d = Math.abs(v - 128);
+            if (d > peak) peak = d;
+          }
+          if (performance.now() - start > 2500) resolve();
+          else setTimeout(tick, 50);
+        };
+        tick();
+      });
+      return peak;
+    });
+
+    // before the onPeerJoin re-add fix this stayed at 0 (Bob got no stream)
+    expect(peakDeviation).toBeGreaterThan(1);
+
+    await contextA.close();
+    await contextB.close();
+  });
 });
 
 test.describe('Room name + image', () => {
