@@ -271,6 +271,9 @@
       peers.set(peerId, { name: peerId.slice(0, 6), avatar: '', muted: false, inVoice: false });
       sendPresence({ name: myName, avatar: myAvatar, inVoice }, peerId);
       if (roomMeta.name || roomMeta.image) sendMeta(roomMeta, peerId);
+      // streams only reach peers present when addStream was called, so
+      // re-send our mic to anyone who joins after we're already in voice
+      if (inVoice && micStream) room.addStream(micStream, peerId);
       renderPeers();
       addSystemMessage(`${peerId.slice(0, 6)} joined`, peerId);
     });
