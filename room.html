@@ -155,91 +155,6 @@
   <!-- audio elements for peers go here -->
   <div id="audioContainer" class="hidden"></div>
 
-  <!-- ============ SETTINGS MODAL ============ -->
-  <div id="settingsModal" class="hidden fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="w-full max-w-sm bg-base-900 ring-soft rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-5">
-        <h2 class="text-lg font-bold text-white">Settings</h2>
-        <button onclick="closeSettings()" title="Close" class="w-8 h-8 grid place-items-center rounded-lg text-slate-400 hover:text-white hover:bg-base-800 transition">
-          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-
-      <div class="flex items-end gap-3">
-        <button type="button" onclick="document.getElementById('settingsAvatarFile').click()" title="Change photo"
-                class="group relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden ring-soft focus:outline-none focus:ring-2 focus:ring-brand transition">
-          <div id="settingsAvatarFallback" class="w-full h-full bg-gradient-to-br from-brand to-accent grid place-items-center text-base font-bold text-white">??</div>
-          <img id="settingsAvatarImg" alt="" class="absolute inset-0 w-full h-full object-cover hidden" />
-          <span class="absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover:opacity-100 transition">
-            <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          </span>
-        </button>
-        <input id="settingsAvatarFile" type="file" accept="image/*" class="hidden" onchange="pickSettingsAvatar(event)" />
-
-        <div class="flex-1">
-          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Username</label>
-          <input id="settingsName" type="text" placeholder="your name"
-                 onkeydown="if(event.key==='Enter')saveSettings()"
-                 class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
-        </div>
-      </div>
-
-      <div class="mt-5">
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Microphone</label>
-        <select id="settingsMic"
-                class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white outline-none ring-soft focus:ring-2 focus:ring-brand transition appearance-none cursor-pointer">
-          <option value="">Default</option>
-        </select>
-      </div>
-
-      <div class="mt-4">
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Speaker</label>
-        <select id="settingsSpeaker"
-                class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white outline-none ring-soft focus:ring-2 focus:ring-brand transition appearance-none cursor-pointer">
-          <option value="">Default</option>
-        </select>
-      </div>
-
-      <div class="mt-4">
-        <label class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
-          <span>Mic volume</span>
-          <span id="micGainLabel" class="normal-case text-slate-300">100%</span>
-        </label>
-        <input id="settingsMicGain" type="range" min="0" max="300" step="10" value="100"
-               oninput="document.getElementById('micGainLabel').textContent = this.value + '%'"
-               class="mt-2 w-full accent-brand cursor-pointer" />
-      </div>
-
-      <div class="mt-5">
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Audio processing</label>
-        <div class="mt-2 space-y-0.5">
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Noise suppression</span>
-            <input id="settingsNoise" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Echo cancellation</span>
-            <input id="settingsEcho" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Auto gain control</span>
-            <input id="settingsAgc" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Room reverb</span>
-            <input id="settingsReverb" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-        </div>
-        <p class="mt-1.5 px-1 text-xs text-slate-500">Turn off suppression/gain for music; reverb adds a little room ambience to your voice.</p>
-      </div>
-
-      <div class="flex gap-2 mt-6">
-        <button onclick="closeSettings()" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
-        <button onclick="saveSettings()" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
-      </div>
-    </div>
-  </div>
-
   <script type="module">
     // ?bundle-deps makes esm.sh bundle Firebase into one instance; without it
     // app + database load separately and you get "Service database is not available"
@@ -251,6 +166,7 @@
       getMicId, setMicId, getSpeakerId, setSpeakerId, getMicGain, setMicGain,
       getAudioProcessing, setAudioProcessing, getReverb, setReverb,
       addRoomToHistory, getRoomMeta, setRoomMeta,
+      initSettingsModal,
     } from './shared.js';
 
     // ── room ID from hash ──
@@ -699,132 +615,7 @@
     }
     window.addEventListener('beforeunload', cleanup);
 
-    // ── settings (change name / avatar) ──
-    let settingsAvatar = null; // staged avatar while modal is open
-
-    async function populateDevices() {
-      const micSel = document.getElementById('settingsMic');
-      const spkSel = document.getElementById('settingsSpeaker');
-      let devices = [];
-      try { devices = await navigator.mediaDevices.enumerateDevices(); } catch {}
-      const fill = (sel, kind, savedId, fallbackLabel) => {
-        const list = devices.filter(d => d.kind === kind);
-        sel.innerHTML = `<option value="">Default</option>` +
-          list.map((d, i) =>
-            `<option value="${escapeHtml(d.deviceId)}">${escapeHtml(d.label || `${fallbackLabel} ${i + 1}`)}</option>`
-          ).join('');
-        sel.value = list.some(d => d.deviceId === savedId) ? savedId : '';
-      };
-      fill(micSel, 'audioinput', micId, 'Microphone');
-      fill(spkSel, 'audiooutput', speakerId, 'Speaker');
-      // hide speaker selector if the browser can't route output (e.g. Firefox)
-      const spkWrap = spkSel.parentElement;
-      const canRoute = 'setSinkId' in HTMLMediaElement.prototype;
-      spkWrap.classList.toggle('hidden', !canRoute);
-    }
-
-    window.openSettings = function() {
-      settingsAvatar = myAvatar;
-      populateDevices();
-      const gainPct = Math.round(micVolume * 100);
-      document.getElementById('settingsMicGain').value = gainPct;
-      document.getElementById('micGainLabel').textContent = gainPct + '%';
-      document.getElementById('settingsNoise').checked = audioProc.noiseSuppression;
-      document.getElementById('settingsEcho').checked = audioProc.echoCancellation;
-      document.getElementById('settingsAgc').checked = audioProc.autoGainControl;
-      document.getElementById('settingsReverb').checked = reverbOn;
-      document.getElementById('settingsName').value = myName;
-      const img = document.getElementById('settingsAvatarImg');
-      const fb = document.getElementById('settingsAvatarFallback');
-      if (myAvatar) {
-        img.src = myAvatar;
-        img.classList.remove('hidden');
-        fb.classList.add('hidden');
-      } else {
-        img.classList.add('hidden');
-        fb.classList.remove('hidden');
-        fb.textContent = initials(myName);
-      }
-      document.getElementById('settingsModal').classList.remove('hidden');
-      document.getElementById('settingsName').focus();
-    };
-
-    window.closeSettings = function() {
-      document.getElementById('settingsModal').classList.add('hidden');
-    };
-
-    window.pickSettingsAvatar = async function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      settingsAvatar = await cropImageFile(file);
-      const img = document.getElementById('settingsAvatarImg');
-      img.src = settingsAvatar;
-      img.classList.remove('hidden');
-      document.getElementById('settingsAvatarFallback').classList.add('hidden');
-    };
-
-    window.saveSettings = async function() {
-      myName = document.getElementById('settingsName').value.trim() || 'guest';
-      myAvatar = settingsAvatar;
-      setMyName(myName);
-      setMyAvatar(myAvatar);
-
-      // audio devices
-      const newMicId = document.getElementById('settingsMic').value;
-      const newSpeakerId = document.getElementById('settingsSpeaker').value;
-      const micChanged = newMicId !== micId;
-      micId = newMicId;
-      speakerId = newSpeakerId;
-      setMicId(micId);
-      setSpeakerId(speakerId);
-
-      // mic volume — gain is live, so a running pipeline updates instantly
-      micVolume = (parseInt(document.getElementById('settingsMicGain').value, 10) || 100) / 100;
-      setMicGain(micVolume);
-      if (micPipeline) micPipeline.gain.gain.value = micVolume;
-
-      // re-route playback to the chosen speaker for everyone we're hearing
-      document.querySelectorAll('#audioContainer audio').forEach(a => {
-        if (a.setSinkId) a.setSinkId(speakerId || '').catch(() => {});
-      });
-
-      // audio processing prefs (noise suppression / echo cancel / auto gain)
-      const newProc = {
-        autoGainControl: document.getElementById('settingsAgc').checked,
-        noiseSuppression: document.getElementById('settingsNoise').checked,
-        echoCancellation: document.getElementById('settingsEcho').checked,
-      };
-      const procChanged = JSON.stringify(newProc) !== JSON.stringify(audioProc);
-      audioProc = newProc;
-      setAudioProcessing(audioProc);
-
-      // reverb — wet gain is live on a running pipeline
-      reverbOn = document.getElementById('settingsReverb').checked;
-      setReverb(reverbOn);
-      if (micPipeline) micPipeline.wet.gain.value = reverbOn ? REVERB_WET : 0;
-
-      // apply mic / processing changes to a live call
-      if (inVoice) {
-        if (micChanged) {
-          await swapMic(); // rebuilds the stream with the new device + processing
-        } else if (procChanged) {
-          try {
-            await Promise.all(micPipeline.raw.getAudioTracks().map(t => t.applyConstraints({
-              channelCount: 1,
-              autoGainControl: audioProc.autoGainControl,
-              noiseSuppression: audioProc.noiseSuppression,
-              echoCancellation: audioProc.echoCancellation,
-            })));
-          } catch { await swapMic(); }
-        }
-      }
-
-      // let everyone in the room see the new name / photo right away
-      sendPresence({ name: myName, avatar: myAvatar, inVoice, muted });
-      renderPeers();
-      closeSettings();
-    };
-
+    // ── settings ──
     async function swapMic() {
       let p;
       try {
@@ -842,10 +633,49 @@
       startMeter('self', micStream);
     }
 
-    // close on backdrop click
-    document.getElementById('settingsModal').addEventListener('click', e => {
-      if (e.target.id === 'settingsModal') closeSettings();
+    const settings = initSettingsModal(document.body, {
+      showIdentity: true,
+      onSave: async (v) => {
+        myName = v.name;
+        myAvatar = v.avatar;
+
+        const micChanged = v.micId !== micId;
+        micId = v.micId;
+        speakerId = v.speakerId;
+
+        micVolume = v.micGain;
+        if (micPipeline) micPipeline.gain.gain.value = micVolume;
+
+        document.querySelectorAll('#audioContainer audio').forEach(a => {
+          if (a.setSinkId) a.setSinkId(speakerId || '').catch(() => {});
+        });
+
+        const procChanged = JSON.stringify(v.audioProcessing) !== JSON.stringify(audioProc);
+        audioProc = v.audioProcessing;
+
+        reverbOn = v.reverb;
+        if (micPipeline) micPipeline.wet.gain.value = reverbOn ? REVERB_WET : 0;
+
+        if (inVoice) {
+          if (micChanged) {
+            await swapMic();
+          } else if (procChanged) {
+            try {
+              await Promise.all(micPipeline.raw.getAudioTracks().map(t => t.applyConstraints({
+                channelCount: 1,
+                autoGainControl: audioProc.autoGainControl,
+                noiseSuppression: audioProc.noiseSuppression,
+                echoCancellation: audioProc.echoCancellation,
+              })));
+            } catch { await swapMic(); }
+          }
+        }
+
+        sendPresence({ name: myName, avatar: myAvatar, inVoice, muted });
+        renderPeers();
+      },
     });
+    window.openSettings = () => settings.open({ name: myName, avatar: myAvatar });
 
     // ── emoji picker ──
     const EMOJI = {

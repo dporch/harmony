@@ -10,7 +10,7 @@
       (meter your own mic; today only peers' circles light up)
 - [ ] Request mic permission on room join — prompt up front instead of waiting
       for the Join voice click
-- [ ] Settings menu on the landing page — edit name/avatar before joining,
+- [x] Settings menu on the landing page — edit name/avatar before joining,
       mirroring the in-room settings
 - [ ] TURN server for restrictive NATs (Cloudflare TURN) — voice/data can fail
       behind symmetric NATs with STUN only; also the only way to hide peer IPs

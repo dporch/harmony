@@ -175,3 +175,196 @@ export function getRoomMeta(id) {
 export function setRoomMeta(id, meta) {
   addRoomToHistory(id, meta);
 }
+
+export function initSettingsModal(container, { showIdentity = false, onSave } = {}) {
+  const identityHtml = showIdentity ? `
+      <div class="flex items-end gap-3 mb-5">
+        <button type="button" id="settingsAvatarBtn" title="Change photo"
+                class="group relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden ring-soft focus:outline-none focus:ring-2 focus:ring-brand transition">
+          <div id="settingsAvatarFallback" class="w-full h-full bg-gradient-to-br from-brand to-accent grid place-items-center text-base font-bold text-white">??</div>
+          <img id="settingsAvatarImg" alt="" class="absolute inset-0 w-full h-full object-cover hidden" />
+          <span class="absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover:opacity-100 transition">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </span>
+        </button>
+        <input id="settingsAvatarFile" type="file" accept="image/*" class="hidden" />
+        <div class="flex-1">
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Username</label>
+          <input id="settingsName" type="text" placeholder="your name"
+                 class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none ring-soft focus:ring-2 focus:ring-brand transition" />
+        </div>
+      </div>` : '';
+
+  const modal = document.createElement('div');
+  modal.id = 'settingsModal';
+  modal.className = 'hidden fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4';
+  modal.innerHTML = `
+    <div class="w-full max-w-sm bg-base-900 ring-soft rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold text-white">Settings</h2>
+        <button data-action="close" title="Close" class="w-8 h-8 grid place-items-center rounded-lg text-slate-400 hover:text-white hover:bg-base-800 transition">
+          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      ${identityHtml}
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Microphone</label>
+        <select id="settingsMic"
+                class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white outline-none ring-soft focus:ring-2 focus:ring-brand transition appearance-none cursor-pointer">
+          <option value="">Default</option>
+        </select>
+      </div>
+      <div class="mt-4" id="settingsSpeakerWrap">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Speaker</label>
+        <select id="settingsSpeaker"
+                class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white outline-none ring-soft focus:ring-2 focus:ring-brand transition appearance-none cursor-pointer">
+          <option value="">Default</option>
+        </select>
+      </div>
+      <div class="mt-4">
+        <label class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>Mic volume</span>
+          <span id="micGainLabel" class="normal-case text-slate-300">100%</span>
+        </label>
+        <input id="settingsMicGain" type="range" min="0" max="300" step="10" value="100"
+               class="mt-2 w-full accent-brand cursor-pointer" />
+      </div>
+      <div class="mt-5">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Audio processing</label>
+        <div class="mt-2 space-y-0.5">
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Noise suppression</span>
+            <input id="settingsNoise" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Echo cancellation</span>
+            <input id="settingsEcho" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Auto gain control</span>
+            <input id="settingsAgc" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Room reverb</span>
+            <input id="settingsReverb" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+        </div>
+        <p class="mt-1.5 px-1 text-xs text-slate-500">Turn off suppression/gain for music; reverb adds a little room ambience to your voice.</p>
+      </div>
+      <div class="flex gap-2 mt-6">
+        <button data-action="cancel" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
+        <button data-action="save" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
+      </div>
+    </div>`;
+  container.appendChild(modal);
+
+  const micSel = modal.querySelector('#settingsMic');
+  const spkSel = modal.querySelector('#settingsSpeaker');
+  const spkWrap = modal.querySelector('#settingsSpeakerWrap');
+  const gainSlider = modal.querySelector('#settingsMicGain');
+  const gainLabel = modal.querySelector('#micGainLabel');
+  const noiseCb = modal.querySelector('#settingsNoise');
+  const echoCb = modal.querySelector('#settingsEcho');
+  const agcCb = modal.querySelector('#settingsAgc');
+  const reverbCb = modal.querySelector('#settingsReverb');
+  const nameInput = modal.querySelector('#settingsName');
+  const avatarImg = modal.querySelector('#settingsAvatarImg');
+  const avatarFb = modal.querySelector('#settingsAvatarFallback');
+  const avatarFile = modal.querySelector('#settingsAvatarFile');
+
+  let stagedAvatar = '';
+
+  gainSlider.addEventListener('input', () => {
+    gainLabel.textContent = gainSlider.value + '%';
+  });
+
+  if (showIdentity) {
+    nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+    modal.querySelector('#settingsAvatarBtn').addEventListener('click', () => avatarFile.click());
+    avatarFile.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      stagedAvatar = await cropImageFile(file);
+      avatarImg.src = stagedAvatar;
+      avatarImg.classList.remove('hidden');
+      avatarFb.classList.add('hidden');
+    });
+  }
+
+  async function populateDevices() {
+    let devices = [];
+    try { devices = await navigator.mediaDevices.enumerateDevices(); } catch {}
+    const fill = (sel, kind, savedId, label) => {
+      const list = devices.filter(d => d.kind === kind);
+      sel.innerHTML = `<option value="">Default</option>` +
+        list.map((d, i) =>
+          `<option value="${escapeHtml(d.deviceId)}">${escapeHtml(d.label || `${label} ${i + 1}`)}</option>`
+        ).join('');
+      sel.value = list.some(d => d.deviceId === savedId) ? savedId : '';
+    };
+    fill(micSel, 'audioinput', getMicId(), 'Microphone');
+    fill(spkSel, 'audiooutput', getSpeakerId(), 'Speaker');
+    spkWrap.classList.toggle('hidden', !('setSinkId' in HTMLMediaElement.prototype));
+  }
+
+  function open(state = {}) {
+    if (showIdentity) {
+      stagedAvatar = state.avatar || '';
+      nameInput.value = state.name || '';
+      if (stagedAvatar) {
+        avatarImg.src = stagedAvatar;
+        avatarImg.classList.remove('hidden');
+        avatarFb.classList.add('hidden');
+      } else {
+        avatarImg.classList.add('hidden');
+        avatarFb.classList.remove('hidden');
+        avatarFb.textContent = initials(state.name || '');
+      }
+    }
+    populateDevices();
+    const pct = Math.round(getMicGain() * 100);
+    gainSlider.value = pct;
+    gainLabel.textContent = pct + '%';
+    const proc = getAudioProcessing();
+    noiseCb.checked = proc.noiseSuppression;
+    echoCb.checked = proc.echoCancellation;
+    agcCb.checked = proc.autoGainControl;
+    reverbCb.checked = getReverb();
+    modal.classList.remove('hidden');
+    if (nameInput) nameInput.focus();
+  }
+
+  function close() {
+    modal.classList.add('hidden');
+  }
+
+  async function save() {
+    const values = {
+      micId: micSel.value,
+      speakerId: spkSel.value,
+      micGain: (parseInt(gainSlider.value, 10) || 100) / 100,
+      audioProcessing: { autoGainControl: agcCb.checked, noiseSuppression: noiseCb.checked, echoCancellation: echoCb.checked },
+      reverb: reverbCb.checked,
+    };
+    if (showIdentity) {
+      values.name = nameInput.value.trim() || 'guest';
+      values.avatar = stagedAvatar;
+      setMyName(values.name);
+      setMyAvatar(values.avatar);
+    }
+    setMicId(values.micId);
+    setSpeakerId(values.speakerId);
+    setMicGain(values.micGain);
+    setAudioProcessing(values.audioProcessing);
+    setReverb(values.reverb);
+    if (onSave) await onSave(values);
+    close();
+  }
+
+  modal.querySelector('[data-action="close"]').addEventListener('click', close);
+  modal.querySelector('[data-action="cancel"]').addEventListener('click', close);
+  modal.querySelector('[data-action="save"]').addEventListener('click', save);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+
+  return { open, close };
+}
