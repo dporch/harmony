@@ -654,8 +654,67 @@ test.describe('Mic swap mid-call', () => {
   });
 });
 
-test.describe('Three peers', () => {
-  test('third peer sees existing users and all receive audio', async ({ browser }) => {
+test.describe('Three-way chat', () => {
+  test('each peer sends a message seen by the other two', async ({ browser }) => {
+    test.setTimeout(180_000);
+
+    const contextA = await browser.newContext();
+    const contextB = await browser.newContext();
+    const contextC = await browser.newContext();
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const pageC = await contextC.newPage();
+
+    // Alice creates room
+    await pageA.goto('/index.html');
+    await pageA.locator('#username').fill('alice');
+    await pageA.locator('button', { hasText: 'Create a room' }).click();
+    await expect(pageA).toHaveURL(/room\.html#/);
+    const roomId = new URL(pageA.url()).hash.slice(1);
+
+    // Bob joins
+    await pageB.goto('/index.html');
+    await pageB.locator('#username').fill('bob');
+    await pageB.locator('#joinInput').fill(roomId);
+    await pageB.locator('button', { hasText: 'Join' }).click();
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+
+    // Charlie joins
+    await pageC.goto('/index.html');
+    await pageC.locator('#username').fill('charlie');
+    await pageC.locator('#joinInput').fill(roomId);
+    await pageC.locator('button', { hasText: 'Join' }).click();
+    await expect(pageA.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
+    await expect(pageB.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
+    await expect(pageC.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
+    await expect(pageC.locator('#peerCount')).toHaveText('3 here');
+
+    // Alice sends → Bob and Charlie see it
+    await pageA.locator('#composer').fill('hello from alice');
+    await pageA.locator('#composer').press('Enter');
+    await expect(pageB.locator('#messages')).toContainText('hello from alice', { timeout: 15_000 });
+    await expect(pageC.locator('#messages')).toContainText('hello from alice', { timeout: 15_000 });
+
+    // Bob sends → Alice and Charlie see it
+    await pageB.locator('#composer').fill('hello from bob');
+    await pageB.locator('#composer').press('Enter');
+    await expect(pageA.locator('#messages')).toContainText('hello from bob', { timeout: 15_000 });
+    await expect(pageC.locator('#messages')).toContainText('hello from bob', { timeout: 15_000 });
+
+    // Charlie sends → Alice and Bob see it
+    await pageC.locator('#composer').fill('hello from charlie');
+    await pageC.locator('#composer').press('Enter');
+    await expect(pageA.locator('#messages')).toContainText('hello from charlie', { timeout: 15_000 });
+    await expect(pageB.locator('#messages')).toContainText('hello from charlie', { timeout: 15_000 });
+
+    await contextA.close();
+    await contextB.close();
+    await contextC.close();
+  });
+});
+
+test.describe('Three-way voice', () => {
+  test('each peer receives audio from both others', async ({ browser }) => {
     test.setTimeout(180_000);
 
     const contextA = await browser.newContext({ permissions: ['microphone'] });
@@ -665,52 +724,119 @@ test.describe('Three peers', () => {
     const pageB = await contextB.newPage();
     const pageC = await contextC.newPage();
 
-    // Alice creates room, Bob joins
+    // Alice creates room
     await pageA.goto('/index.html');
     await pageA.locator('#username').fill('alice');
     await pageA.locator('button', { hasText: 'Create a room' }).click();
     await expect(pageA).toHaveURL(/room\.html#/);
     const roomId = new URL(pageA.url()).hash.slice(1);
 
+    // Bob joins
     await pageB.goto('/index.html');
     await pageB.locator('#username').fill('bob');
     await pageB.locator('#joinInput').fill(roomId);
     await pageB.locator('button', { hasText: 'Join' }).click();
     await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
-    await expect(pageB.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
 
-    // Charlie joins — all three see each other
+    // Charlie joins
     await pageC.goto('/index.html');
     await pageC.locator('#username').fill('charlie');
     await pageC.locator('#joinInput').fill(roomId);
     await pageC.locator('button', { hasText: 'Join' }).click();
-
-    await expect(pageA.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
     await expect(pageB.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
     await expect(pageC.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
-    await expect(pageC.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
-    await expect(pageC.locator('#peerCount')).toHaveText('3 here');
 
     // all three join voice
     await pageA.locator('button', { hasText: 'Join voice' }).click();
     await pageB.locator('button', { hasText: 'Join voice' }).click();
     await pageC.locator('button', { hasText: 'Join voice' }).click();
 
-    // Charlie receives two audio streams (Alice + Bob)
-    await expect(pageC.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
-    const energy0 = await measurePeakEnergy(pageC, { audioIndex: 0 });
-    const energy1 = await measurePeakEnergy(pageC, { audioIndex: 1 });
-    expect(energy0).toBeGreaterThan(1);
-    expect(energy1).toBeGreaterThan(1);
+    // Alice receives 2 streams with energy
+    await expect(pageA.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    expect(await measurePeakEnergy(pageA, { audioIndex: 0 })).toBeGreaterThan(1);
+    expect(await measurePeakEnergy(pageA, { audioIndex: 1 })).toBeGreaterThan(1);
 
-    // Bob also receives two streams (Alice + Charlie)
+    // Bob receives 2 streams with energy
     await expect(pageB.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    expect(await measurePeakEnergy(pageB, { audioIndex: 0 })).toBeGreaterThan(1);
+    expect(await measurePeakEnergy(pageB, { audioIndex: 1 })).toBeGreaterThan(1);
 
-    // Charlie sends a chat message — both Alice and Bob see it
-    await pageC.locator('#composer').fill('hello from charlie');
-    await pageC.locator('#composer').press('Enter');
-    await expect(pageA.locator('#messages')).toContainText('hello from charlie', { timeout: 15_000 });
-    await expect(pageB.locator('#messages')).toContainText('hello from charlie', { timeout: 15_000 });
+    // Charlie receives 2 streams with energy
+    await expect(pageC.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    expect(await measurePeakEnergy(pageC, { audioIndex: 0 })).toBeGreaterThan(1);
+    expect(await measurePeakEnergy(pageC, { audioIndex: 1 })).toBeGreaterThan(1);
+
+    await contextA.close();
+    await contextB.close();
+    await contextC.close();
+  });
+});
+
+test.describe('Voice disconnect', () => {
+  test('leaving voice stops your audio for others while remaining peers keep hearing each other', async ({ browser }) => {
+    test.setTimeout(180_000);
+
+    const contextA = await browser.newContext({ permissions: ['microphone'] });
+    const contextB = await browser.newContext({ permissions: ['microphone'] });
+    const contextC = await browser.newContext({ permissions: ['microphone'] });
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const pageC = await contextC.newPage();
+
+    // Alice creates room
+    await pageA.goto('/index.html');
+    await pageA.locator('#username').fill('alice');
+    await pageA.locator('button', { hasText: 'Create a room' }).click();
+    await expect(pageA).toHaveURL(/room\.html#/);
+    const roomId = new URL(pageA.url()).hash.slice(1);
+
+    // Bob joins
+    await pageB.goto('/index.html');
+    await pageB.locator('#username').fill('bob');
+    await pageB.locator('#joinInput').fill(roomId);
+    await pageB.locator('button', { hasText: 'Join' }).click();
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+
+    // Charlie joins
+    await pageC.goto('/index.html');
+    await pageC.locator('#username').fill('charlie');
+    await pageC.locator('#joinInput').fill(roomId);
+    await pageC.locator('button', { hasText: 'Join' }).click();
+    await expect(pageB.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
+    await expect(pageC.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
+
+    // all three join voice
+    await pageA.locator('button', { hasText: 'Join voice' }).click();
+    await pageB.locator('button', { hasText: 'Join voice' }).click();
+    await pageC.locator('button', { hasText: 'Join voice' }).click();
+
+    // everyone hears everyone (2 audio elements each)
+    await expect(pageA.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    await expect(pageB.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    await expect(pageC.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+
+    // Charlie leaves voice
+    await pageC.getByTitle('Leave voice').click();
+    await expect(pageC.locator('#voiceJoinPanel')).toBeVisible();
+    await expect(pageC.locator('#voiceActivePanel')).toBeHidden();
+
+    // Alice and Bob see Charlie move to lurking
+    await expect(pageA.locator('#lurkingList')).toContainText('charlie', { timeout: 15_000 });
+    await expect(pageB.locator('#lurkingList')).toContainText('charlie', { timeout: 15_000 });
+
+    // Charlie's outgoing audio goes silent — one of Alice's two streams loses energy
+    await expect.poll(async () => {
+      const e0 = await measurePeakEnergy(pageA, { audioIndex: 0, durationMs: 1000 });
+      const e1 = await measurePeakEnergy(pageA, { audioIndex: 1, durationMs: 1000 });
+      return [e0 > 1, e1 > 1].filter(Boolean).length;
+    }, { timeout: 15_000 }).toBe(1);
+
+    // same on Bob's side
+    await expect.poll(async () => {
+      const e0 = await measurePeakEnergy(pageB, { audioIndex: 0, durationMs: 1000 });
+      const e1 = await measurePeakEnergy(pageB, { audioIndex: 1, durationMs: 1000 });
+      return [e0 > 1, e1 > 1].filter(Boolean).length;
+    }, { timeout: 15_000 }).toBe(1);
 
     await contextA.close();
     await contextB.close();
