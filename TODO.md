@@ -6,13 +6,19 @@
 ## Nice-to-haves / future
 - [ ] TURN server for restrictive NATs (Cloudflare TURN) — voice/data can fail
       behind symmetric NATs with STUN only
-- [ ] MQTT broker resilience — only 3 of 5 default brokers are alive; consider
-      a self-hosted or paid broker for reliability
+- [ ] Signaling reliability — switched from MQTT (dead eclipse broker) to Nostr
+      relays, which are healthier but still free/shared public infra. For
+      rock-solid peer discovery, move to an own-backend Trystero strategy:
+        - Firebase (trystero/firebase) — generous free tier, ~5 min setup, just
+          embed a config object; most reliable, recommended next step
+        - Supabase (trystero/supabase) — open-source equivalent
+      Signaling only matters at connection setup, so this fixes "sometimes it
+      won't connect", not in-call quality (that's the TURN item).
 - [x] Voice end-to-end test — verified between 2 computers (2026-06-18), audio heard
 - [ ] Cross-browser test run (currently chromium only in playwright.config.js)
 
 ## Done
-- [x] P2P chat + voice (Trystero MQTT v0.18.0)
+- [x] P2P chat + voice (Trystero v0.18.0 — Nostr signaling)
 - [x] Avatar upload + persistence, room history, username persistence
 - [x] Emoji picker
 - [x] Playwright e2e tests included
