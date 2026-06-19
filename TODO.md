@@ -4,21 +4,25 @@
 - [ ] Verify favicon 404 is gone once Pages redeploys
 
 ## Nice-to-haves / future
+- [ ] Custom emojis — Twitch / BetterTTV emotes in chat (fetch emote sets,
+      render in messages + the picker)
+- [ ] Self speaking indicator — your own avatar circle lights up when you talk
+      (meter your own mic; today only peers' circles light up)
+- [ ] Request mic permission on room join — prompt up front instead of waiting
+      for the Join voice click
+- [ ] Settings menu on the landing page — edit name/avatar before joining,
+      mirroring the in-room settings
 - [ ] TURN server for restrictive NATs (Cloudflare TURN) — voice/data can fail
-      behind symmetric NATs with STUN only
-- [ ] Signaling reliability — switched from MQTT (dead eclipse broker) to Nostr
-      relays, which are healthier but still free/shared public infra. For
-      rock-solid peer discovery, move to an own-backend Trystero strategy:
-        - Firebase (trystero/firebase) — generous free tier, ~5 min setup, just
-          embed a config object; most reliable, recommended next step
-        - Supabase (trystero/supabase) — open-source equivalent
-      Signaling only matters at connection setup, so this fixes "sometimes it
-      won't connect", not in-call quality (that's the TURN item).
-- [x] Voice end-to-end test — verified between 2 computers (2026-06-18), audio heard
+      behind symmetric NATs with STUN only; also the only way to hide peer IPs
 - [ ] Cross-browser test run (currently chromium only in playwright.config.js)
+- [x] Signaling reliability — moved MQTT → Nostr → Firebase Realtime Database
+      (own backend, scoped to the `__trystero__` subtree). Fast, no dead-relay
+      flakes. Anonymous auth was evaluated and skipped (fights the no-build CDN
+      setup + weak protection since anyone can mint an anon token).
+- [x] Voice end-to-end test — verified between 2 computers (2026-06-18), audio heard
 
 ## Done
-- [x] P2P chat + voice (Trystero v0.18.0 — Nostr signaling)
+- [x] P2P chat + voice (Trystero v0.18.0 — Firebase signaling)
 - [x] Avatar upload + persistence, room history, username persistence
 - [x] Emoji picker
 - [x] Playwright e2e tests included
