@@ -7,6 +7,19 @@ export const RTC_CONFIG = {
   ],
 };
 
+// Firebase Realtime Database used for signaling (peer discovery + WebRTC
+// handshake only — chat/voice stay P2P and never touch it). The URL is a
+// public identifier, not a secret; access is governed by the database rules.
+export const FIREBASE_DB_URL = 'https://webrtc-signaling-93ec5-default-rtdb.firebaseio.com';
+
+// Fallback option: pinned Nostr relays, if you ever switch back to that strategy.
+export const RELAY_URLS = [
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+  'wss://relay.nostr.band',
+  'wss://relay.snort.social',
+];
+
 export const GRADIENTS = [
   'from-brand to-accent',
   'from-orange-400 to-pink-500',
@@ -80,6 +93,15 @@ export function getSpeakerId() {
 
 export function setSpeakerId(id) {
   localStorage.setItem('harmony:speakerId', id || '');
+}
+
+export function getMicGain() {
+  const v = parseFloat(localStorage.getItem('harmony:micGain'));
+  return Number.isFinite(v) ? v : 1; // 1.0 == 100%, unity gain
+}
+
+export function setMicGain(v) {
+  localStorage.setItem('harmony:micGain', String(v));
 }
 
 export function getRoomHistory() {

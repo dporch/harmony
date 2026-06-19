@@ -200,6 +200,16 @@
         </select>
       </div>
 
+      <div class="mt-4">
+        <label class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>Mic volume</span>
+          <span id="micGainLabel" class="normal-case text-slate-300">100%</span>
+        </label>
+        <input id="settingsMicGain" type="range" min="0" max="300" step="10" value="100"
+               oninput="document.getElementById('micGainLabel').textContent = this.value + '%'"
+               class="mt-2 w-full accent-brand cursor-pointer" />
+      </div>
+
       <div class="flex gap-2 mt-6">
         <button onclick="closeSettings()" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
         <button onclick="saveSettings()" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
@@ -208,11 +218,13 @@
   </div>
 
   <script type="module">
-    import { joinRoom, selfId } from 'https://esm.sh/trystero@0.18.0/nostr';
+    // ?bundle-deps makes esm.sh bundle Firebase into one instance; without it
+    // app + database load separately and you get "Service database is not available"
+    import { joinRoom, selfId } from 'https://esm.sh/trystero@0.18.0/firebase?bundle-deps';
     import {
-      APP_ID, RTC_CONFIG, gradientFor, initials, escapeHtml, now, isImageUrl,
+      APP_ID, RTC_CONFIG, FIREBASE_DB_URL, gradientFor, initials, escapeHtml, now, isImageUrl,
       getMyName, setMyName, getMyAvatar, setMyAvatar,
-      getMicId, setMicId, getSpeakerId, setSpeakerId,
+      getMicId, setMicId, getSpeakerId, setSpeakerId, getMicGain, setMicGain,
       addRoomToHistory, getRoomMeta, setRoomMeta,
     } from './shared.js';
 
@@ -244,14 +256,20 @@
 
     // ── state ──
     const peers = new Map();
-    let micStream = null;
+    let micStream = null;       // the outgoing (gain-adjusted) stream we send
+    let micPipeline = null;     // { ctx, source, gain, dest, raw } feeding it
     let muted = false;
     let inVoice = false;
     let micId = getMicId();
     let speakerId = getSpeakerId();
+    let micVolume = getMicGain(); // 1.0 == unity
 
     // ── join trystero room ──
-    const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, roomId);
+    // Firebase strategy: appId is the Realtime Database URL
+    const room = joinRoom(
+      { appId: FIREBASE_DB_URL, rtcConfig: RTC_CONFIG },
+      roomId,
+    );
 
     // v0.18 API: makeAction returns [send, setOnComplete, setOnProgress]
     const [sendPresence, onPresence] = room.makeAction('pres');
@@ -515,23 +533,50 @@
 
     // ── voice ──
     // grab the saved mic, but fall back to the default if it's gone (unplugged,
-    // different machine) so a stale device id can't lock you out of voice
+    // different machine) so a stale device id can't lock you out of voice.
+    // capture mono (channelCount: 1) so a mic the OS maps to one stereo channel
+    // doesn't get heard on only one side — voice is mono anyway
     async function getMic() {
-      if (!micId) return navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!micId) return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
       try {
-        return await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: micId } } });
+        return await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: micId }, channelCount: 1 } });
       } catch {
-        return navigator.mediaDevices.getUserMedia({ audio: true });
+        return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
       }
     }
 
+    // route the raw mic through a GainNode so the user can boost/cut their
+    // level; the destination stream is what we actually send to peers
+    async function buildMic() {
+      const raw = await getMic();
+      const ctx = new AudioContext();
+      await ctx.resume().catch(() => {});
+      const source = ctx.createMediaStreamSource(raw);
+      const gain = ctx.createGain();
+      gain.gain.value = micVolume;
+      const dest = ctx.createMediaStreamDestination();
+      source.connect(gain).connect(dest);
+      return { ctx, source, gain, dest, raw, stream: dest.stream };
+    }
+
+    function teardownMic(p) {
+      if (!p) return;
+      p.raw.getTracks().forEach(t => t.stop());
+      try { p.source.disconnect(); p.gain.disconnect(); } catch {}
+      p.ctx.close().catch(() => {});
+    }
+
     window.joinVoice = async function() {
+      let p;
       try {
-        micStream = await getMic();
+        p = await buildMic();
       } catch (err) {
         addSystemMessage('Could not access microphone');
         return;
       }
+      micPipeline = p;
+      micStream = p.stream;
+      micStream.getAudioTracks().forEach(t => t.enabled = !muted);
       inVoice = true;
       room.addStream(micStream);
       sendPresence({ name: myName, avatar: myAvatar, inVoice: true, muted });
@@ -557,9 +602,10 @@
       if (!inVoice) return;
       if (micStream) {
         room.removeStream(micStream);
-        micStream.getTracks().forEach(t => t.stop());
         micStream = null;
       }
+      teardownMic(micPipeline);
+      micPipeline = null;
       inVoice = false;
       muted = false;
       sendPresence({ name: myName, avatar: myAvatar, inVoice: false, muted: false });
@@ -585,7 +631,7 @@
     };
 
     function cleanup() {
-      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      teardownMic(micPipeline);
       room.leave();
     }
     window.addEventListener('beforeunload', cleanup);
@@ -617,6 +663,9 @@
     window.openSettings = function() {
       settingsAvatar = myAvatar;
       populateDevices();
+      const gainPct = Math.round(micVolume * 100);
+      document.getElementById('settingsMicGain').value = gainPct;
+      document.getElementById('micGainLabel').textContent = gainPct + '%';
       document.getElementById('settingsName').value = myName;
       const img = document.getElementById('settingsAvatarImg');
       const fb = document.getElementById('settingsAvatarFallback');
@@ -675,6 +724,11 @@
       setMicId(micId);
       setSpeakerId(speakerId);
 
+      // mic volume — gain is live, so a running pipeline updates instantly
+      micVolume = (parseInt(document.getElementById('settingsMicGain').value, 10) || 100) / 100;
+      setMicGain(micVolume);
+      if (micPipeline) micPipeline.gain.gain.value = micVolume;
+
       // re-route playback to the chosen speaker for everyone we're hearing
       document.querySelectorAll('#audioContainer audio').forEach(a => {
         if (a.setSinkId) a.setSinkId(speakerId || '').catch(() => {});
@@ -690,18 +744,17 @@
     };
 
     async function swapMic() {
-      let next;
+      let p;
       try {
-        next = await getMic();
+        p = await buildMic();
       } catch {
         addSystemMessage('Could not switch to the selected microphone');
         return;
       }
-      if (micStream) {
-        room.removeStream(micStream);
-        micStream.getTracks().forEach(t => t.stop());
-      }
-      micStream = next;
+      if (micStream) room.removeStream(micStream);
+      teardownMic(micPipeline);
+      micPipeline = p;
+      micStream = p.stream;
       micStream.getAudioTracks().forEach(t => t.enabled = !muted);
       room.addStream(micStream);
     }

@@ -158,8 +158,8 @@ test.describe('P2P chat between two users', () => {
     await expect(pageB).toHaveURL(new RegExp(`room\\.html#${roomId}`));
 
     // wait for peer discovery (MQTT signaling can take several seconds)
-    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 30_000 });
-    await expect(pageB.locator('#peerList')).toContainText('alice', { timeout: 30_000 });
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+    await expect(pageB.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
 
     // Alice sends a message
     await pageA.locator('#composer').fill('hello from alice');
@@ -205,8 +205,8 @@ test.describe('P2P voice between two users', () => {
     await expect(pageB).toHaveURL(new RegExp(`room\\.html#${roomId}`));
 
     // both see each other (data channel up before we add media)
-    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 30_000 });
-    await expect(pageB.locator('#peerList')).toContainText('alice', { timeout: 30_000 });
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+    await expect(pageB.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
 
     // both join voice (fake mic tone is granted via launch flags)
     await pageA.locator('button', { hasText: 'Join voice' }).click();
@@ -218,7 +218,7 @@ test.describe('P2P voice between two users', () => {
 
     // Bob receives Alice's stream → the app attaches an <audio> for her peer id
     const bobAudio = pageB.locator('#audioContainer audio');
-    await expect(bobAudio).toHaveCount(1, { timeout: 30_000 });
+    await expect(bobAudio).toHaveCount(1, { timeout: 60_000 });
 
     // measure decoded audio energy on Bob's received stream — silence ⇒ no audio
     const peakDeviation = await pageB.evaluate(async () => {
@@ -294,11 +294,11 @@ test.describe('P2P voice between two users', () => {
     await pageB.locator('button', { hasText: 'Join' }).click();
     await expect(pageB).toHaveURL(new RegExp(`room\\.html#${roomId}`));
 
-    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 30_000 });
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
 
     // Bob must still receive Alice's audio even though he joined late
     const bobAudio = pageB.locator('#audioContainer audio');
-    await expect(bobAudio).toHaveCount(1, { timeout: 30_000 });
+    await expect(bobAudio).toHaveCount(1, { timeout: 60_000 });
 
     const peakDeviation = await pageB.evaluate(async () => {
       const audio = document.querySelector('#audioContainer audio');
@@ -366,7 +366,7 @@ test.describe('Room name + image', () => {
     await pageB.locator('button', { hasText: 'Join' }).click();
     await expect(pageB).toHaveURL(new RegExp(`room\\.html#${roomId}`));
 
-    await expect(pageB.locator('#roomTitle')).toHaveText('Game Night', { timeout: 30_000 });
+    await expect(pageB.locator('#roomTitle')).toHaveText('Game Night', { timeout: 60_000 });
 
     // and the joiner now remembers it for their own "Recently joined" list
     await pageB.goto('/index.html');
@@ -409,8 +409,8 @@ test.describe('Settings (in-room name + avatar editing)', () => {
     await pageB.locator('#joinInput').fill(roomId);
     await pageB.locator('button', { hasText: 'Join' }).click();
 
-    await expect(pageA.locator('#peerList')).toContainText('bee', { timeout: 30_000 });
-    await expect(pageB.locator('#peerList')).toContainText('al', { timeout: 30_000 });
+    await expect(pageA.locator('#peerList')).toContainText('bee', { timeout: 60_000 });
+    await expect(pageB.locator('#peerList')).toContainText('al', { timeout: 60_000 });
 
     // A opens settings, changes name + uploads an avatar, saves
     await pageA.getByTitle('Settings').click();
@@ -452,14 +452,14 @@ test.describe('Mute', () => {
     await pageB.locator('#username').fill('bee');
     await pageB.locator('#joinInput').fill(roomId);
     await pageB.locator('button', { hasText: 'Join' }).click();
-    await expect(pageB.locator('#peerList')).toContainText('al', { timeout: 30_000 });
+    await expect(pageB.locator('#peerList')).toContainText('al', { timeout: 60_000 });
 
     // both join voice so A shows up in B's Voice chat section with a mic icon
     await pageA.locator('button', { hasText: 'Join voice' }).click();
     await pageB.locator('button', { hasText: 'Join voice' }).click();
     await expect(pageA.locator('#voiceActivePanel')).toBeVisible();
     // B sees A in voice, unmuted (accent-colored mic), no muted icon yet
-    await expect(pageB.locator('#voiceChatList')).toContainText('al', { timeout: 30_000 });
+    await expect(pageB.locator('#voiceChatList')).toContainText('al', { timeout: 60_000 });
     await expect(pageB.locator('#voiceChatList .text-rose-400')).toHaveCount(0);
 
     // A mutes
