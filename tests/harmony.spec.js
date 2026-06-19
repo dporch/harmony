@@ -3,6 +3,39 @@ import path from 'path';
 
 const AVATAR_PATH = path.join(import.meta.dirname, 'fixtures', 'avatar.png');
 
+async function measurePeakEnergy(page, { durationMs = 2000, audioIndex = 0 } = {}) {
+  return page.evaluate(async ({ ms, idx }) => {
+    const audios = document.querySelectorAll('#audioContainer audio');
+    const audio = audios[idx];
+    const stream = audio?.srcObject;
+    if (!stream || stream.getAudioTracks().length === 0) return -1;
+    const ctx = new AudioContext();
+    await ctx.resume();
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    let peak = 0;
+    const start = performance.now();
+    await new Promise(resolve => {
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        for (const v of buf) {
+          const d = Math.abs(v - 128);
+          if (d > peak) peak = d;
+        }
+        if (performance.now() - start > ms) resolve();
+        else setTimeout(tick, 50);
+      };
+      tick();
+    });
+    source.disconnect();
+    ctx.close();
+    return peak;
+  }, { ms: durationMs, idx: audioIndex });
+}
+
 test.describe('Avatar upload + persistence + display', () => {
   test('uploaded avatar persists through refresh and shows in room', async ({ page }) => {
     await page.goto('/index.html');
@@ -434,7 +467,7 @@ test.describe('Settings (in-room name + avatar editing)', () => {
 });
 
 test.describe('Mute', () => {
-  test('muting flips your label and shows a muted icon to peers', async ({ browser }) => {
+  test('muting silences audio and shows a muted icon to peers', async ({ browser }) => {
     test.setTimeout(120_000);
 
     const contextA = await browser.newContext({ permissions: ['microphone'] });
@@ -458,20 +491,33 @@ test.describe('Mute', () => {
     await pageA.locator('button', { hasText: 'Join voice' }).click();
     await pageB.locator('button', { hasText: 'Join voice' }).click();
     await expect(pageA.locator('#voiceActivePanel')).toBeVisible();
-    // B sees A in voice, unmuted (accent-colored mic), no muted icon yet
     await expect(pageB.locator('#voiceChatList')).toContainText('al', { timeout: 60_000 });
-    await expect(pageB.locator('#voiceChatList .text-rose-400')).toHaveCount(0);
+    await expect(pageB.locator('#audioContainer audio')).toHaveCount(1, { timeout: 60_000 });
 
-    // A mutes
+    // audio is flowing before mute
+    const energyBefore = await measurePeakEnergy(pageB);
+    expect(energyBefore).toBeGreaterThan(1);
+
+    // A mutes — UI updates on both sides
     await pageA.locator('#micBtn').click();
     await expect(pageA.locator('#micBtnLabel')).toHaveText('Unmute');
-    // B sees A's mic icon switch to the muted (rose) variant
     await expect(pageB.locator('#voiceChatList .text-rose-400').first()).toBeVisible({ timeout: 15_000 });
 
-    // A unmutes → label resets and the muted icon clears for B
+    // audio energy drops to silence (poll to let WebRTC buffers drain)
+    await expect.poll(
+      () => measurePeakEnergy(pageB, { durationMs: 1000 }),
+      { timeout: 15_000 },
+    ).toBeLessThanOrEqual(1);
+
+    // A unmutes — UI restores and audio returns
     await pageA.locator('#micBtn').click();
     await expect(pageA.locator('#micBtnLabel')).toHaveText('Mute');
     await expect(pageB.locator('#voiceChatList .text-rose-400')).toHaveCount(0, { timeout: 15_000 });
+
+    await expect.poll(
+      () => measurePeakEnergy(pageB, { durationMs: 1000 }),
+      { timeout: 15_000 },
+    ).toBeGreaterThan(1);
 
     await contextA.close();
     await contextB.close();
@@ -549,5 +595,196 @@ test.describe('Copy invite link', () => {
     await page.getByTitle('Copy invite link').click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe(roomUrl);
+  });
+});
+
+test.describe('Mic swap mid-call', () => {
+  test('swapping mic device in settings keeps audio flowing', async ({ browser }) => {
+    test.setTimeout(120_000);
+
+    const contextA = await browser.newContext({ permissions: ['microphone'] });
+    const contextB = await browser.newContext({ permissions: ['microphone'] });
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+
+    await pageA.goto('/index.html');
+    await pageA.locator('#username').fill('alice');
+    await pageA.locator('button', { hasText: 'Create a room' }).click();
+    await expect(pageA).toHaveURL(/room\.html#/);
+    const roomId = new URL(pageA.url()).hash.slice(1);
+
+    await pageB.goto('/index.html');
+    await pageB.locator('#username').fill('bob');
+    await pageB.locator('#joinInput').fill(roomId);
+    await pageB.locator('button', { hasText: 'Join' }).click();
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+
+    // both join voice
+    await pageA.locator('button', { hasText: 'Join voice' }).click();
+    await pageB.locator('button', { hasText: 'Join voice' }).click();
+    await expect(pageB.locator('#audioContainer audio')).toHaveCount(1, { timeout: 60_000 });
+
+    // audio flows before swap
+    const energyBefore = await measurePeakEnergy(pageB);
+    expect(energyBefore).toBeGreaterThan(1);
+
+    // Alice opens settings and switches mic device
+    await pageA.waitForFunction(() => typeof window.openSettings === 'function');
+    await pageA.getByTitle('Settings').click();
+    await expect(pageA.locator('#settingsModal')).toBeVisible();
+    await expect.poll(() => pageA.locator('#settingsMic option').count()).toBeGreaterThan(1);
+
+    const micSelect = pageA.locator('#settingsMic');
+    const currentVal = await micSelect.inputValue();
+    const newVal = currentVal === ''
+      ? await pageA.locator('#settingsMic option').nth(1).getAttribute('value')
+      : '';
+    await micSelect.selectOption(newVal);
+    await pageA.locator('button', { hasText: 'Save' }).click();
+    await expect(pageA.locator('#settingsModal')).toBeHidden();
+
+    // audio re-establishes after swapMic tears down and rebuilds the pipeline
+    await expect.poll(
+      () => measurePeakEnergy(pageB, { durationMs: 1000 }),
+      { timeout: 30_000 },
+    ).toBeGreaterThan(1);
+
+    await contextA.close();
+    await contextB.close();
+  });
+});
+
+test.describe('Three peers', () => {
+  test('third peer sees existing users and all receive audio', async ({ browser }) => {
+    test.setTimeout(180_000);
+
+    const contextA = await browser.newContext({ permissions: ['microphone'] });
+    const contextB = await browser.newContext({ permissions: ['microphone'] });
+    const contextC = await browser.newContext({ permissions: ['microphone'] });
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const pageC = await contextC.newPage();
+
+    // Alice creates room, Bob joins
+    await pageA.goto('/index.html');
+    await pageA.locator('#username').fill('alice');
+    await pageA.locator('button', { hasText: 'Create a room' }).click();
+    await expect(pageA).toHaveURL(/room\.html#/);
+    const roomId = new URL(pageA.url()).hash.slice(1);
+
+    await pageB.goto('/index.html');
+    await pageB.locator('#username').fill('bob');
+    await pageB.locator('#joinInput').fill(roomId);
+    await pageB.locator('button', { hasText: 'Join' }).click();
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+    await expect(pageB.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
+
+    // Charlie joins — all three see each other
+    await pageC.goto('/index.html');
+    await pageC.locator('#username').fill('charlie');
+    await pageC.locator('#joinInput').fill(roomId);
+    await pageC.locator('button', { hasText: 'Join' }).click();
+
+    await expect(pageA.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
+    await expect(pageB.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
+    await expect(pageC.locator('#peerList')).toContainText('alice', { timeout: 60_000 });
+    await expect(pageC.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+    await expect(pageC.locator('#peerCount')).toHaveText('3 here');
+
+    // all three join voice
+    await pageA.locator('button', { hasText: 'Join voice' }).click();
+    await pageB.locator('button', { hasText: 'Join voice' }).click();
+    await pageC.locator('button', { hasText: 'Join voice' }).click();
+
+    // Charlie receives two audio streams (Alice + Bob)
+    await expect(pageC.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    const energy0 = await measurePeakEnergy(pageC, { audioIndex: 0 });
+    const energy1 = await measurePeakEnergy(pageC, { audioIndex: 1 });
+    expect(energy0).toBeGreaterThan(1);
+    expect(energy1).toBeGreaterThan(1);
+
+    // Bob also receives two streams (Alice + Charlie)
+    await expect(pageB.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+
+    // Charlie sends a chat message — both Alice and Bob see it
+    await pageC.locator('#composer').fill('hello from charlie');
+    await pageC.locator('#composer').press('Enter');
+    await expect(pageA.locator('#messages')).toContainText('hello from charlie', { timeout: 15_000 });
+    await expect(pageB.locator('#messages')).toContainText('hello from charlie', { timeout: 15_000 });
+
+    await contextA.close();
+    await contextB.close();
+    await contextC.close();
+  });
+});
+
+test.describe('Peer leave with remaining peers', () => {
+  test('two peers keep audio after the third leaves the room', async ({ browser }) => {
+    test.setTimeout(180_000);
+
+    const contextA = await browser.newContext({ permissions: ['microphone'] });
+    const contextB = await browser.newContext({ permissions: ['microphone'] });
+    const contextC = await browser.newContext({ permissions: ['microphone'] });
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const pageC = await contextC.newPage();
+
+    // Alice creates room
+    await pageA.goto('/index.html');
+    await pageA.locator('#username').fill('alice');
+    await pageA.locator('button', { hasText: 'Create a room' }).click();
+    await expect(pageA).toHaveURL(/room\.html#/);
+    const roomId = new URL(pageA.url()).hash.slice(1);
+
+    // Bob joins
+    await pageB.goto('/index.html');
+    await pageB.locator('#username').fill('bob');
+    await pageB.locator('#joinInput').fill(roomId);
+    await pageB.locator('button', { hasText: 'Join' }).click();
+    await expect(pageA.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+
+    // Charlie joins
+    await pageC.goto('/index.html');
+    await pageC.locator('#username').fill('charlie');
+    await pageC.locator('#joinInput').fill(roomId);
+    await pageC.locator('button', { hasText: 'Join' }).click();
+    await expect(pageB.locator('#peerList')).toContainText('charlie', { timeout: 60_000 });
+    await expect(pageC.locator('#peerList')).toContainText('bob', { timeout: 60_000 });
+
+    // all three join voice
+    await pageA.locator('button', { hasText: 'Join voice' }).click();
+    await pageB.locator('button', { hasText: 'Join voice' }).click();
+    await pageC.locator('button', { hasText: 'Join voice' }).click();
+
+    // Bob has 2 audio elements (Alice + Charlie)
+    await expect(pageB.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+    // Charlie has 2 audio elements (Alice + Bob)
+    await expect(pageC.locator('#audioContainer audio')).toHaveCount(2, { timeout: 60_000 });
+
+    // Alice leaves the room entirely
+    await pageA.waitForFunction(() => typeof window.leaveRoom === 'function');
+    await pageA.locator('button', { hasText: 'Leave room' }).click();
+    await expect(pageA).toHaveURL(/index\.html$/);
+
+    // Bob and Charlie see Alice disappear
+    await expect(pageB.locator('#peerList')).not.toContainText('alice', { timeout: 15_000 });
+    await expect(pageC.locator('#peerList')).not.toContainText('alice', { timeout: 15_000 });
+    await expect(pageB.locator('#peerCount')).toHaveText('2 here');
+
+    // Alice's audio element is cleaned up, one remains
+    await expect(pageB.locator('#audioContainer audio')).toHaveCount(1, { timeout: 15_000 });
+    await expect(pageC.locator('#audioContainer audio')).toHaveCount(1, { timeout: 15_000 });
+
+    // Bob still hears Charlie
+    const bobEnergy = await measurePeakEnergy(pageB);
+    expect(bobEnergy).toBeGreaterThan(1);
+
+    // Charlie still hears Bob
+    const charlieEnergy = await measurePeakEnergy(pageC);
+    expect(charlieEnergy).toBeGreaterThan(1);
+
+    await contextA.close();
+    await contextB.close();
+    await contextC.close();
   });
 });
