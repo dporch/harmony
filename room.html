@@ -200,25 +200,6 @@
         </select>
       </div>
 
-      <div class="mt-5">
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Audio processing</label>
-        <div class="mt-2 space-y-0.5">
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Noise suppression</span>
-            <input id="settingsNoise" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Echo cancellation</span>
-            <input id="settingsEcho" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
-            <span class="text-sm text-slate-200">Auto gain control</span>
-            <input id="settingsAgc" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
-          </label>
-        </div>
-        <p class="mt-1.5 px-1 text-xs text-slate-500">Turn these off for music or "hear everything" setups.</p>
-      </div>
-
       <div class="flex gap-2 mt-6">
         <button onclick="closeSettings()" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
         <button onclick="saveSettings()" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
@@ -232,7 +213,6 @@
       APP_ID, RTC_CONFIG, gradientFor, initials, escapeHtml, now, isImageUrl,
       getMyName, setMyName, getMyAvatar, setMyAvatar,
       getMicId, setMicId, getSpeakerId, setSpeakerId,
-      getAudioProcessing, setAudioProcessing,
       addRoomToHistory, getRoomMeta, setRoomMeta,
     } from './shared.js';
 
@@ -269,17 +249,6 @@
     let inVoice = false;
     let micId = getMicId();
     let speakerId = getSpeakerId();
-    let audioProc = getAudioProcessing();
-
-    // capture constraints reflecting the chosen mic + processing prefs
-    function micConstraints() {
-      return {
-        ...(micId ? { deviceId: { exact: micId } } : {}),
-        autoGainControl: audioProc.autoGainControl,
-        noiseSuppression: audioProc.noiseSuppression,
-        echoCancellation: audioProc.echoCancellation,
-      };
-    }
 
     // ── join trystero room ──
     const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, roomId);
@@ -507,7 +476,9 @@
     // ── voice ──
     window.joinVoice = async function() {
       try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints() });
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: micId ? { deviceId: { exact: micId } } : true,
+        });
       } catch (err) {
         addSystemMessage('Could not access microphone');
         return;
@@ -597,9 +568,6 @@
     window.openSettings = function() {
       settingsAvatar = myAvatar;
       populateDevices();
-      document.getElementById('settingsNoise').checked = audioProc.noiseSuppression;
-      document.getElementById('settingsEcho').checked = audioProc.echoCancellation;
-      document.getElementById('settingsAgc').checked = audioProc.autoGainControl;
       document.getElementById('settingsName').value = myName;
       const img = document.getElementById('settingsAvatarImg');
       const fb = document.getElementById('settingsAvatarFallback');
@@ -658,31 +626,13 @@
       setMicId(micId);
       setSpeakerId(speakerId);
 
-      // audio processing prefs
-      const newProc = {
-        autoGainControl: document.getElementById('settingsAgc').checked,
-        noiseSuppression: document.getElementById('settingsNoise').checked,
-        echoCancellation: document.getElementById('settingsEcho').checked,
-      };
-      const procChanged = JSON.stringify(newProc) !== JSON.stringify(audioProc);
-      audioProc = newProc;
-      setAudioProcessing(audioProc);
-
       // re-route playback to the chosen speaker for everyone we're hearing
       document.querySelectorAll('#audioContainer audio').forEach(a => {
         if (a.setSinkId) a.setSinkId(speakerId || '').catch(() => {});
       });
 
-      // apply mic / processing changes live if we're in a call
-      if (inVoice) {
-        if (micChanged) {
-          await swapMic();
-        } else if (procChanged && micStream) {
-          try {
-            await Promise.all(micStream.getAudioTracks().map(t => t.applyConstraints(micConstraints())));
-          } catch { await swapMic(); }
-        }
-      }
+      // if we're live in voice and switched mics, swap the outgoing track
+      if (micChanged && inVoice) await swapMic();
 
       // let everyone in the room see the new name / photo right away
       sendPresence({ name: myName, avatar: myAvatar, inVoice });
@@ -693,7 +643,9 @@
     async function swapMic() {
       let next;
       try {
-        next = await navigator.mediaDevices.getUserMedia({ audio: micConstraints() });
+        next = await navigator.mediaDevices.getUserMedia({
+          audio: micId ? { deviceId: { exact: micId } } : true,
+        });
       } catch {
         addSystemMessage('Could not switch to the selected microphone');
         return;

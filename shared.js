@@ -82,21 +82,6 @@ export function setSpeakerId(id) {
   localStorage.setItem('harmony:speakerId', id || '');
 }
 
-// audio processing — default on (matches WebRTC defaults); stored as 'false' to opt out
-export function getAudioProcessing() {
-  return {
-    autoGainControl: localStorage.getItem('harmony:agc') !== 'false',
-    noiseSuppression: localStorage.getItem('harmony:noise') !== 'false',
-    echoCancellation: localStorage.getItem('harmony:echo') !== 'false',
-  };
-}
-
-export function setAudioProcessing(opts) {
-  localStorage.setItem('harmony:agc', String(!!opts.autoGainControl));
-  localStorage.setItem('harmony:noise', String(!!opts.noiseSuppression));
-  localStorage.setItem('harmony:echo', String(!!opts.echoCancellation));
-}
-
 export function getRoomHistory() {
   try { return JSON.parse(localStorage.getItem('harmony:rooms') || '[]'); }
   catch { return []; }
