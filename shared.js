@@ -95,6 +95,22 @@ export function setSpeakerId(id) {
   localStorage.setItem('harmony:speakerId', id || '');
 }
 
+// WebRTC audio processing — default on (matches browser defaults); a stored
+// 'false' opts out. Turn these off for music / "hear everything" setups.
+export function getAudioProcessing() {
+  return {
+    autoGainControl: localStorage.getItem('harmony:agc') !== 'false',
+    noiseSuppression: localStorage.getItem('harmony:noise') !== 'false',
+    echoCancellation: localStorage.getItem('harmony:echo') !== 'false',
+  };
+}
+
+export function setAudioProcessing(opts) {
+  localStorage.setItem('harmony:agc', String(!!opts.autoGainControl));
+  localStorage.setItem('harmony:noise', String(!!opts.noiseSuppression));
+  localStorage.setItem('harmony:echo', String(!!opts.echoCancellation));
+}
+
 export function getMicGain() {
   const v = parseFloat(localStorage.getItem('harmony:micGain'));
   return Number.isFinite(v) ? v : 1; // 1.0 == 100%, unity gain
@@ -102,6 +118,15 @@ export function getMicGain() {
 
 export function setMicGain(v) {
   localStorage.setItem('harmony:micGain', String(v));
+}
+
+// subtle room reverb on outgoing voice (synthesized impulse response, no asset)
+export function getReverb() {
+  return localStorage.getItem('harmony:reverb') === 'true';
+}
+
+export function setReverb(on) {
+  localStorage.setItem('harmony:reverb', String(!!on));
 }
 
 export function getRoomHistory() {

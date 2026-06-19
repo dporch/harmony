@@ -210,6 +210,29 @@
                class="mt-2 w-full accent-brand cursor-pointer" />
       </div>
 
+      <div class="mt-5">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Audio processing</label>
+        <div class="mt-2 space-y-0.5">
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Noise suppression</span>
+            <input id="settingsNoise" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Echo cancellation</span>
+            <input id="settingsEcho" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Auto gain control</span>
+            <input id="settingsAgc" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+          <label class="flex items-center justify-between px-1 py-1.5 rounded-lg hover:bg-base-850 cursor-pointer transition">
+            <span class="text-sm text-slate-200">Room reverb</span>
+            <input id="settingsReverb" type="checkbox" class="w-4 h-4 accent-brand cursor-pointer" />
+          </label>
+        </div>
+        <p class="mt-1.5 px-1 text-xs text-slate-500">Turn off suppression/gain for music; reverb adds a little room ambience to your voice.</p>
+      </div>
+
       <div class="flex gap-2 mt-6">
         <button onclick="closeSettings()" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
         <button onclick="saveSettings()" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
@@ -225,6 +248,7 @@
       APP_ID, RTC_CONFIG, FIREBASE_DB_URL, gradientFor, initials, escapeHtml, now, isImageUrl,
       getMyName, setMyName, getMyAvatar, setMyAvatar,
       getMicId, setMicId, getSpeakerId, setSpeakerId, getMicGain, setMicGain,
+      getAudioProcessing, setAudioProcessing, getReverb, setReverb,
       addRoomToHistory, getRoomMeta, setRoomMeta,
     } from './shared.js';
 
@@ -263,6 +287,9 @@
     let micId = getMicId();
     let speakerId = getSpeakerId();
     let micVolume = getMicGain(); // 1.0 == unity
+    let audioProc = getAudioProcessing();
+    let reverbOn = getReverb();
+    const REVERB_WET = 0.28; // subtle — dry voice stays dominant
 
     // ── join trystero room ──
     // Firebase strategy: appId is the Realtime Database URL
@@ -537,16 +564,35 @@
     // capture mono (channelCount: 1) so a mic the OS maps to one stereo channel
     // doesn't get heard on only one side — voice is mono anyway
     async function getMic() {
-      if (!micId) return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+      const base = {
+        channelCount: 1,
+        autoGainControl: audioProc.autoGainControl,
+        noiseSuppression: audioProc.noiseSuppression,
+        echoCancellation: audioProc.echoCancellation,
+      };
+      if (!micId) return navigator.mediaDevices.getUserMedia({ audio: base });
       try {
-        return await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: micId }, channelCount: 1 } });
+        return await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: micId } } });
       } catch {
-        return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+        return navigator.mediaDevices.getUserMedia({ audio: base });
       }
     }
 
-    // route the raw mic through a GainNode so the user can boost/cut their
-    // level; the destination stream is what we actually send to peers
+    // synthesize a short decaying-noise impulse response → small-room reverb,
+    // so we don't need to ship an audio asset
+    function makeRoomImpulse(ctx) {
+      const seconds = 0.45, decay = 3;
+      const len = Math.floor(ctx.sampleRate * seconds);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+      return buf;
+    }
+
+    // route the raw mic through gain (volume) and a dry/wet reverb mix; the
+    // destination stream is what we actually send to peers
     async function buildMic() {
       const raw = await getMic();
       const ctx = new AudioContext();
@@ -555,14 +601,28 @@
       const gain = ctx.createGain();
       gain.gain.value = micVolume;
       const dest = ctx.createMediaStreamDestination();
-      source.connect(gain).connect(dest);
-      return { ctx, source, gain, dest, raw, stream: dest.stream };
+
+      // dry path always on; wet (reverb) path mixed in only when enabled
+      const dry = ctx.createGain();
+      const wet = ctx.createGain();
+      wet.gain.value = reverbOn ? REVERB_WET : 0;
+      const convolver = ctx.createConvolver();
+      convolver.buffer = makeRoomImpulse(ctx);
+
+      source.connect(gain);
+      gain.connect(dry).connect(dest);
+      gain.connect(convolver).connect(wet).connect(dest);
+
+      return { ctx, source, gain, dry, wet, convolver, dest, raw, stream: dest.stream };
     }
 
     function teardownMic(p) {
       if (!p) return;
       p.raw.getTracks().forEach(t => t.stop());
-      try { p.source.disconnect(); p.gain.disconnect(); } catch {}
+      try {
+        p.source.disconnect(); p.gain.disconnect();
+        p.dry.disconnect(); p.wet.disconnect(); p.convolver.disconnect();
+      } catch {}
       p.ctx.close().catch(() => {});
     }
 
@@ -666,6 +726,10 @@
       const gainPct = Math.round(micVolume * 100);
       document.getElementById('settingsMicGain').value = gainPct;
       document.getElementById('micGainLabel').textContent = gainPct + '%';
+      document.getElementById('settingsNoise').checked = audioProc.noiseSuppression;
+      document.getElementById('settingsEcho').checked = audioProc.echoCancellation;
+      document.getElementById('settingsAgc').checked = audioProc.autoGainControl;
+      document.getElementById('settingsReverb').checked = reverbOn;
       document.getElementById('settingsName').value = myName;
       const img = document.getElementById('settingsAvatarImg');
       const fb = document.getElementById('settingsAvatarFallback');
@@ -734,8 +798,36 @@
         if (a.setSinkId) a.setSinkId(speakerId || '').catch(() => {});
       });
 
-      // if we're live in voice and switched mics, swap the outgoing track
-      if (micChanged && inVoice) await swapMic();
+      // audio processing prefs (noise suppression / echo cancel / auto gain)
+      const newProc = {
+        autoGainControl: document.getElementById('settingsAgc').checked,
+        noiseSuppression: document.getElementById('settingsNoise').checked,
+        echoCancellation: document.getElementById('settingsEcho').checked,
+      };
+      const procChanged = JSON.stringify(newProc) !== JSON.stringify(audioProc);
+      audioProc = newProc;
+      setAudioProcessing(audioProc);
+
+      // reverb — wet gain is live on a running pipeline
+      reverbOn = document.getElementById('settingsReverb').checked;
+      setReverb(reverbOn);
+      if (micPipeline) micPipeline.wet.gain.value = reverbOn ? REVERB_WET : 0;
+
+      // apply mic / processing changes to a live call
+      if (inVoice) {
+        if (micChanged) {
+          await swapMic(); // rebuilds the stream with the new device + processing
+        } else if (procChanged) {
+          try {
+            await Promise.all(micPipeline.raw.getAudioTracks().map(t => t.applyConstraints({
+              channelCount: 1,
+              autoGainControl: audioProc.autoGainControl,
+              noiseSuppression: audioProc.noiseSuppression,
+              echoCancellation: audioProc.echoCancellation,
+            })));
+          } catch { await swapMic(); }
+        }
+      }
 
       // let everyone in the room see the new name / photo right away
       sendPresence({ name: myName, avatar: myAvatar, inVoice, muted });

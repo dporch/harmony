@@ -477,3 +477,77 @@ test.describe('Mute', () => {
     await contextB.close();
   });
 });
+
+test.describe('Audio settings', () => {
+  test('device pickers populate and mic volume / reverb / toggles persist across reload', async ({ browser }) => {
+    const context = await browser.newContext({ permissions: ['microphone'] });
+    const page = await context.newPage();
+
+    await page.goto('/index.html');
+    await page.locator('#username').fill('settingsuser');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+
+    // wait for the room module to wire up before clicking the inline handler
+    await page.waitForFunction(() => typeof window.openSettings === 'function');
+    await page.getByTitle('Settings').click();
+    await expect(page.locator('#settingsModal')).toBeVisible();
+
+    // mic picker populates from enumerateDevices (Default + the fake device)
+    await expect.poll(() => page.locator('#settingsMic option').count()).toBeGreaterThan(1);
+
+    // bump mic volume to 150%, turn noise suppression off, turn reverb on
+    await page.locator('#settingsMicGain').evaluate(el => {
+      el.value = '150';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect(page.locator('#micGainLabel')).toHaveText('150%');
+    await page.locator('#settingsNoise').uncheck();
+    await page.locator('#settingsReverb').check();
+    await page.locator('button', { hasText: 'Save' }).click();
+    await expect(page.locator('#settingsModal')).toBeHidden();
+
+    // reload → everything restored from localStorage
+    await page.reload();
+    await page.waitForFunction(() => typeof window.openSettings === 'function');
+    await page.getByTitle('Settings').click();
+    await expect(page.locator('#settingsModal')).toBeVisible();
+    await expect(page.locator('#settingsMicGain')).toHaveValue('150');
+    await expect(page.locator('#micGainLabel')).toHaveText('150%');
+    await expect(page.locator('#settingsNoise')).not.toBeChecked();
+    await expect(page.locator('#settingsReverb')).toBeChecked();
+    await expect(page.locator('#settingsEcho')).toBeChecked(); // untouched toggle stays on
+
+    await context.close();
+  });
+});
+
+test.describe('Leave room', () => {
+  test('leaving a room returns to the landing page', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.locator('#username').fill('leaver');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+
+    await page.waitForFunction(() => typeof window.leaveRoom === 'function');
+    await page.locator('button', { hasText: 'Leave room' }).click();
+    await expect(page).toHaveURL(/index\.html$/);
+  });
+});
+
+test.describe('Copy invite link', () => {
+  test('copy button puts the room URL on the clipboard', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await page.goto('/index.html');
+    await page.locator('#username').fill('copier');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+    const roomUrl = page.url();
+
+    await page.waitForFunction(() => typeof window.copyLink === 'function');
+    await page.getByTitle('Copy invite link').click();
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip).toBe(roomUrl);
+  });
+});
