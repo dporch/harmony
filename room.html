@@ -246,6 +246,7 @@
     import { joinRoom, selfId } from 'https://esm.sh/trystero@0.18.0/firebase?bundle-deps';
     import {
       APP_ID, RTC_CONFIG, FIREBASE_DB_URL, gradientFor, initials, escapeHtml, now, isImageUrl,
+      cropImageFile,
       getMyName, setMyName, getMyAvatar, setMyAvatar,
       getMicId, setMicId, getSpeakerId, setSpeakerId, getMicGain, setMicGain,
       getAudioProcessing, setAudioProcessing, getReverb, setReverb,
@@ -441,8 +442,11 @@
     const lurkingList = document.getElementById('lurkingList');
 
     // ── mic status icons ──
-    const MIC_ON = '<svg viewBox="0 0 24 24" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
-    const MIC_MUTED = '<svg viewBox="0 0 24 24" class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/></svg>';
+    const MIC_ON_PATH = '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
+    const MIC_MUTED_PATH = '<line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/>';
+    const micSvg = (cls, path) => `<svg viewBox="0 0 24 24" class="w-4 h-4 ${cls}" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>`;
+    const MIC_ON = micSvg('text-accent', MIC_ON_PATH);
+    const MIC_MUTED = micSvg('text-rose-400', MIC_MUTED_PATH);
 
     function rowHtml(avatarHtml, nameHtml, micIcon) {
       return `
@@ -650,9 +654,7 @@
       muted = !muted;
       micStream.getAudioTracks().forEach(t => t.enabled = !muted);
       document.getElementById('micBtnLabel').textContent = muted ? 'Unmute' : 'Mute';
-      const muteIcon = '<line x1="3" y1="3" x2="21" y2="21"/><path d="M9 9v2a3 3 0 004.6 2.5M15 9.3V5a3 3 0 00-5.7-1.3M5 11a7 7 0 0010.7 6M19 11a7 7 0 01-.6 2.8"/>';
-      const onIcon = '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
-      document.getElementById('micBtnIcon').innerHTML = muted ? muteIcon : onIcon;
+      document.getElementById('micBtnIcon').innerHTML = muted ? MIC_MUTED_PATH : MIC_ON_PATH;
       document.getElementById('micBtn').classList.toggle('bg-rose-500/20', muted);
       sendMuteState({ muted });
       renderPeers();
@@ -669,9 +671,8 @@
       inVoice = false;
       muted = false;
       sendPresence({ name: myName, avatar: myAvatar, inVoice: false, muted: false });
-      // reset mute button to its default look
       document.getElementById('micBtnLabel').textContent = 'Mute';
-      document.getElementById('micBtnIcon').innerHTML = '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
+      document.getElementById('micBtnIcon').innerHTML = MIC_ON_PATH;
       document.getElementById('micBtn').classList.remove('bg-rose-500/20');
       // swap dock back to the join state
       document.getElementById('voiceActivePanel').classList.add('hidden');
@@ -750,27 +751,14 @@
       document.getElementById('settingsModal').classList.add('hidden');
     };
 
-    window.pickSettingsAvatar = function(e) {
+    window.pickSettingsAvatar = async function(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const image = new Image();
-        image.onload = () => {
-          const S = 96, c = document.createElement('canvas');
-          c.width = c.height = S;
-          const ctx = c.getContext('2d');
-          const side = Math.min(image.width, image.height);
-          ctx.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, S, S);
-          settingsAvatar = c.toDataURL('image/jpeg', 0.85);
-          const img = document.getElementById('settingsAvatarImg');
-          img.src = settingsAvatar;
-          img.classList.remove('hidden');
-          document.getElementById('settingsAvatarFallback').classList.add('hidden');
-        };
-        image.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+      settingsAvatar = await cropImageFile(file);
+      const img = document.getElementById('settingsAvatarImg');
+      img.src = settingsAvatar;
+      img.classList.remove('hidden');
+      document.getElementById('settingsAvatarFallback').classList.add('hidden');
     };
 
     window.saveSettings = async function() {

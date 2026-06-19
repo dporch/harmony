@@ -118,13 +118,11 @@
   </main>
 
   <script type="module">
-    import { getMyName, setMyName, getMyAvatar, setMyAvatar, getRoomHistory, addRoomToHistory, initials, escapeHtml } from './shared.js';
-
-    const initialsOf = n => (n.trim() || '??').slice(0,2).toUpperCase();
+    import { getMyName, setMyName, getMyAvatar, setMyAvatar, getRoomHistory, addRoomToHistory, initials, escapeHtml, GRADIENTS, cropImageFile } from './shared.js';
 
     function syncInitials() {
       document.getElementById('avatarFallback').textContent =
-        initialsOf(document.getElementById('username').value);
+        initials(document.getElementById('username').value);
     }
     window.syncInitials = syncInitials;
 
@@ -144,50 +142,24 @@
       document.getElementById('avatarFallback').classList.add('hidden');
     }
 
-    window.pickAvatar = function(e) {
+    window.pickAvatar = async function(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const S = 96, c = document.createElement('canvas');
-          c.width = c.height = S;
-          const ctx = c.getContext('2d');
-          const side = Math.min(img.width, img.height);
-          ctx.drawImage(img, (img.width-side)/2, (img.height-side)/2, side, side, 0, 0, S, S);
-          const dataUrl = c.toDataURL('image/jpeg', 0.85);
-          setMyAvatar(dataUrl);
-          showAvatar(dataUrl);
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+      const dataUrl = await cropImageFile(file);
+      setMyAvatar(dataUrl);
+      showAvatar(dataUrl);
     };
 
     // ── room icon picker ──
     let roomImgData = '';
-    window.pickRoomImg = function(e) {
+    window.pickRoomImg = async function(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const image = new Image();
-        image.onload = () => {
-          const S = 96, c = document.createElement('canvas');
-          c.width = c.height = S;
-          const ctx = c.getContext('2d');
-          const side = Math.min(image.width, image.height);
-          ctx.drawImage(image, (image.width-side)/2, (image.height-side)/2, side, side, 0, 0, S, S);
-          roomImgData = c.toDataURL('image/jpeg', 0.85);
-          const img = document.getElementById('roomImg');
-          img.src = roomImgData;
-          img.classList.remove('hidden');
-          document.getElementById('roomImgFallback').classList.add('hidden');
-        };
-        image.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+      roomImgData = await cropImageFile(file);
+      const img = document.getElementById('roomImg');
+      img.src = roomImgData;
+      img.classList.remove('hidden');
+      document.getElementById('roomImgFallback').classList.add('hidden');
     };
 
     function saveName() {
@@ -228,12 +200,6 @@
       window.location = `room.html#${id}`;
     };
 
-    // render recent rooms from localStorage
-    const GRADIENTS = [
-      'from-brand to-accent', 'from-orange-400 to-pink-500', 'from-sky-400 to-indigo-500',
-      'from-emerald-400 to-teal-500', 'from-pink-500 to-brand', 'from-amber-400 to-orange-500',
-    ];
-
     function renderRecent() {
       const rooms = getRoomHistory();
       const section = document.getElementById('recentSection');
@@ -246,7 +212,7 @@
         const grad = GRADIENTS[i % GRADIENTS.length];
         const ago = timeAgo(room.lastVisited);
         const label = room.name || `${short}…`;
-        const ini = escapeHtml((room.name || short).slice(0, 2).toUpperCase());
+        const ini = escapeHtml(initials(room.name || short));
         const iconHtml = room.image
           ? `<img src="${escapeHtml(room.image)}" class="w-8 h-8 rounded-lg object-cover" alt="" />`
           : `<div class="w-8 h-8 rounded-lg bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>`;

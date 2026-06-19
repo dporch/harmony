@@ -40,7 +40,7 @@ export function gradientFor(peerId) {
 }
 
 export function initials(name) {
-  return (name || '??').slice(0, 2).replace(/^./, c => c.toUpperCase());
+  return (name?.trim() || '??').slice(0, 2).toUpperCase();
 }
 
 export function escapeHtml(s) {
@@ -59,6 +59,25 @@ export function isImageUrl(text) {
     const url = new URL(text.trim());
     return IMG_EXTENSIONS.test(url.pathname) || IMG_HOSTS.test(url.hostname);
   } catch { return false; }
+}
+
+export function cropImageFile(file, size = 96) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        const side = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // localStorage helpers
@@ -135,8 +154,9 @@ export function getRoomHistory() {
 }
 
 export function addRoomToHistory(id, meta = {}) {
-  const existing = getRoomHistory().find(r => r.id === id) || {};
-  const rooms = getRoomHistory().filter(r => r.id !== id);
+  const all = getRoomHistory();
+  const existing = all.find(r => r.id === id) || {};
+  const rooms = all.filter(r => r.id !== id);
   rooms.unshift({
     id,
     name: meta.name ?? existing.name ?? '',
