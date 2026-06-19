@@ -184,6 +184,22 @@
         </div>
       </div>
 
+      <div class="mt-5">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Microphone</label>
+        <select id="settingsMic"
+                class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white outline-none ring-soft focus:ring-2 focus:ring-brand transition appearance-none cursor-pointer">
+          <option value="">Default</option>
+        </select>
+      </div>
+
+      <div class="mt-4">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">Speaker</label>
+        <select id="settingsSpeaker"
+                class="mt-1.5 w-full bg-base-850 rounded-xl px-4 py-3 text-white outline-none ring-soft focus:ring-2 focus:ring-brand transition appearance-none cursor-pointer">
+          <option value="">Default</option>
+        </select>
+      </div>
+
       <div class="flex gap-2 mt-6">
         <button onclick="closeSettings()" class="flex-1 bg-base-800 hover:bg-base-700 ring-soft rounded-xl py-2.5 font-semibold text-slate-300 transition">Cancel</button>
         <button onclick="saveSettings()" class="flex-1 bg-brand hover:bg-brand-600 rounded-xl py-2.5 font-semibold text-white transition">Save</button>
@@ -196,6 +212,7 @@
     import {
       APP_ID, RTC_CONFIG, gradientFor, initials, escapeHtml, now, isImageUrl,
       getMyName, setMyName, getMyAvatar, setMyAvatar,
+      getMicId, setMicId, getSpeakerId, setSpeakerId,
       addRoomToHistory, getRoomMeta, setRoomMeta,
     } from './shared.js';
 
@@ -230,6 +247,8 @@
     let micStream = null;
     let muted = false;
     let inVoice = false;
+    let micId = getMicId();
+    let speakerId = getSpeakerId();
 
     // ── join trystero room ──
     const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, roomId);
@@ -307,6 +326,7 @@
         document.getElementById('audioContainer').appendChild(audio);
       }
       audio.srcObject = stream;
+      if (speakerId && audio.setSinkId) audio.setSinkId(speakerId).catch(() => {});
 
       try {
         const ctx = new AudioContext();
@@ -456,7 +476,9 @@
     // ── voice ──
     window.joinVoice = async function() {
       try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: micId ? { deviceId: { exact: micId } } : true,
+        });
       } catch (err) {
         addSystemMessage('Could not access microphone');
         return;
@@ -522,8 +544,30 @@
     // ── settings (change name / avatar) ──
     let settingsAvatar = null; // staged avatar while modal is open
 
+    async function populateDevices() {
+      const micSel = document.getElementById('settingsMic');
+      const spkSel = document.getElementById('settingsSpeaker');
+      let devices = [];
+      try { devices = await navigator.mediaDevices.enumerateDevices(); } catch {}
+      const fill = (sel, kind, savedId, fallbackLabel) => {
+        const list = devices.filter(d => d.kind === kind);
+        sel.innerHTML = `<option value="">Default</option>` +
+          list.map((d, i) =>
+            `<option value="${escapeHtml(d.deviceId)}">${escapeHtml(d.label || `${fallbackLabel} ${i + 1}`)}</option>`
+          ).join('');
+        sel.value = list.some(d => d.deviceId === savedId) ? savedId : '';
+      };
+      fill(micSel, 'audioinput', micId, 'Microphone');
+      fill(spkSel, 'audiooutput', speakerId, 'Speaker');
+      // hide speaker selector if the browser can't route output (e.g. Firefox)
+      const spkWrap = spkSel.parentElement;
+      const canRoute = 'setSinkId' in HTMLMediaElement.prototype;
+      spkWrap.classList.toggle('hidden', !canRoute);
+    }
+
     window.openSettings = function() {
       settingsAvatar = myAvatar;
+      populateDevices();
       document.getElementById('settingsName').value = myName;
       const img = document.getElementById('settingsAvatarImg');
       const fb = document.getElementById('settingsAvatarFallback');
@@ -567,16 +611,53 @@
       reader.readAsDataURL(file);
     };
 
-    window.saveSettings = function() {
+    window.saveSettings = async function() {
       myName = document.getElementById('settingsName').value.trim() || 'guest';
       myAvatar = settingsAvatar;
       setMyName(myName);
       setMyAvatar(myAvatar);
+
+      // audio devices
+      const newMicId = document.getElementById('settingsMic').value;
+      const newSpeakerId = document.getElementById('settingsSpeaker').value;
+      const micChanged = newMicId !== micId;
+      micId = newMicId;
+      speakerId = newSpeakerId;
+      setMicId(micId);
+      setSpeakerId(speakerId);
+
+      // re-route playback to the chosen speaker for everyone we're hearing
+      document.querySelectorAll('#audioContainer audio').forEach(a => {
+        if (a.setSinkId) a.setSinkId(speakerId || '').catch(() => {});
+      });
+
+      // if we're live in voice and switched mics, swap the outgoing track
+      if (micChanged && inVoice) await swapMic();
+
       // let everyone in the room see the new name / photo right away
       sendPresence({ name: myName, avatar: myAvatar, inVoice });
       renderPeers();
       closeSettings();
     };
+
+    async function swapMic() {
+      let next;
+      try {
+        next = await navigator.mediaDevices.getUserMedia({
+          audio: micId ? { deviceId: { exact: micId } } : true,
+        });
+      } catch {
+        addSystemMessage('Could not switch to the selected microphone');
+        return;
+      }
+      if (micStream) {
+        room.removeStream(micStream);
+        micStream.getTracks().forEach(t => t.stop());
+      }
+      micStream = next;
+      micStream.getAudioTracks().forEach(t => t.enabled = !muted);
+      room.addStream(micStream);
+    }
 
     // close on backdrop click
     document.getElementById('settingsModal').addEventListener('click', e => {

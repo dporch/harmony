@@ -66,6 +66,22 @@ export function setMyAvatar(dataUrl) {
   localStorage.setItem('harmony:avatar', dataUrl);
 }
 
+export function getMicId() {
+  return localStorage.getItem('harmony:micId') || '';
+}
+
+export function setMicId(id) {
+  localStorage.setItem('harmony:micId', id || '');
+}
+
+export function getSpeakerId() {
+  return localStorage.getItem('harmony:speakerId') || '';
+}
+
+export function setSpeakerId(id) {
+  localStorage.setItem('harmony:speakerId', id || '');
+}
+
 export function getRoomHistory() {
   try { return JSON.parse(localStorage.getItem('harmony:rooms') || '[]'); }
   catch { return []; }
