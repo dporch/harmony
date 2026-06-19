@@ -469,8 +469,8 @@
       // you
       const myIni = initials(myName);
       const myAvatarHtml = myAvatar
-        ? `<img src="${myAvatar}" class="w-8 h-8 rounded-full object-cover" alt="" />`
-        : `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-accent grid place-items-center text-xs font-bold text-white">${myIni}</div>`;
+        ? `<img id="peer-avatar-self" src="${myAvatar}" class="w-8 h-8 rounded-full object-cover" alt="" />`
+        : `<div id="peer-avatar-self" class="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-accent grid place-items-center text-xs font-bold text-white">${myIni}</div>`;
       const myNameHtml = `${escapeHtml(myName)} <span class="text-slate-500 font-normal">(you)</span>`;
       if (inVoice) {
         voiceRows.push(rowHtml(myAvatarHtml, myNameHtml, muted ? MIC_MUTED : MIC_ON));
@@ -647,6 +647,7 @@
       document.getElementById('voiceJoinPanel').classList.add('hidden');
       document.getElementById('voiceActivePanel').classList.remove('hidden');
       renderPeers();
+      startMeter('self', micStream);
     };
 
     window.toggleMic = function() {
@@ -662,6 +663,7 @@
 
     window.leaveVoice = function() {
       if (!inVoice) return;
+      stopMeter('self');
       if (micStream) {
         room.removeStream(micStream);
         micStream = null;
@@ -837,6 +839,7 @@
       micStream = p.stream;
       micStream.getAudioTracks().forEach(t => t.enabled = !muted);
       room.addStream(micStream);
+      startMeter('self', micStream);
     }
 
     // close on backdrop click

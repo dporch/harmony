@@ -1,12 +1,12 @@
 # harmony — TODO
 
 ## Deploy
-- [ ] Verify favicon 404 is gone once Pages redeploys
+- [x] Verify favicon 404 is gone once Pages redeploys
 
 ## Nice-to-haves / future
 - [ ] Custom emojis — Twitch / BetterTTV emotes in chat (fetch emote sets,
       render in messages + the picker)
-- [ ] Self speaking indicator — your own avatar circle lights up when you talk
+- [x] Self speaking indicator — your own avatar circle lights up when you talk
       (meter your own mic; today only peers' circles light up)
 - [ ] Request mic permission on room join — prompt up front instead of waiting
       for the Join voice click
