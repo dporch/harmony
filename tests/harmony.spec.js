@@ -168,6 +168,125 @@ test.describe('Emoji picker', () => {
   });
 });
 
+test.describe('BetterTTV + 7TV emotes', () => {
+  test('BTTV tab loads emotes, picks one, and renders it as an image in chat', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+    await page.waitForFunction(() => typeof window.toggleEmoji === 'function', { timeout: 10_000 });
+
+    // wait for BTTV emotes to load
+    await page.waitForFunction(() => {
+      const tabs = document.querySelectorAll('#emojiTabs button');
+      const bttvTab = [...tabs].find(b => b.textContent === 'BTTV');
+      if (!bttvTab) return false;
+      bttvTab.click();
+      return document.querySelectorAll('#emojiGrid button').length > 0;
+    }, { timeout: 10_000 });
+
+    // open picker and click BTTV tab
+    await page.locator('#emojiToggle').click();
+    await page.locator('#emojiTabs button', { hasText: 'BTTV' }).click();
+
+    // grid should have emote images
+    const firstEmote = page.locator('#emojiGrid button').first();
+    await expect(firstEmote).toBeVisible();
+    const emoteCode = await firstEmote.getAttribute('title');
+    expect(emoteCode).toBeTruthy();
+    await expect(firstEmote.locator('img')).toBeVisible();
+
+    // click it — code appears in composer
+    await firstEmote.click();
+    const composerValue = await page.locator('#composer').inputValue();
+    expect(composerValue).toContain(emoteCode);
+
+    // send and verify it renders as an <img> in chat
+    await page.locator('#composer').press('Enter');
+    const lastMsg = page.locator('#messages .group').last();
+    const emoteImg = lastMsg.locator(`img[alt="${emoteCode}"]`);
+    await expect(emoteImg).toBeVisible({ timeout: 5_000 });
+    const src = await emoteImg.getAttribute('src');
+    expect(src).toContain('betterttv.net');
+  });
+
+  test('emotes load from localStorage cache without fetching', async ({ page }) => {
+    // first visit — fetches from API and populates cache
+    await page.goto('/index.html');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+    await page.waitForFunction(() => typeof window.toggleEmoji === 'function', { timeout: 10_000 });
+    // wait for both caches to be written
+    await page.waitForFunction(() => {
+      const bttv = localStorage.getItem('harmony:bttv');
+      const stv = localStorage.getItem('harmony:7tv');
+      return bttv && stv;
+    }, { timeout: 10_000 });
+
+    // block the APIs so any fetch would fail
+    await page.route('**/api.betterttv.net/**', route => route.abort());
+    await page.route('**/7tv.io/**', route => route.abort());
+
+    // second visit — should load from cache
+    await page.goto('/index.html');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+    await page.waitForFunction(() => typeof window.toggleEmoji === 'function', { timeout: 10_000 });
+
+    // BTTV tab should have emotes despite API being blocked
+    await page.locator('#emojiToggle').click();
+    await page.locator('#emojiTabs button', { hasText: 'BTTV' }).click();
+    await expect(page.locator('#emojiGrid button').first()).toBeVisible();
+    const bttvCount = await page.locator('#emojiGrid button').count();
+    expect(bttvCount).toBeGreaterThan(0);
+
+    // 7TV tab too
+    await page.locator('#emojiTabs button', { hasText: '7TV' }).click();
+    await expect(page.locator('#emojiGrid button').first()).toBeVisible();
+    const stvCount = await page.locator('#emojiGrid button').count();
+    expect(stvCount).toBeGreaterThan(0);
+  });
+
+  test('7TV tab loads emotes, picks one, and renders it as an image in chat', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.locator('button', { hasText: 'Create a room' }).click();
+    await expect(page).toHaveURL(/room\.html#/);
+    await page.waitForFunction(() => typeof window.toggleEmoji === 'function', { timeout: 10_000 });
+
+    // wait for 7TV emotes to load
+    await page.waitForFunction(() => {
+      const tabs = document.querySelectorAll('#emojiTabs button');
+      const tab = [...tabs].find(b => b.textContent === '7TV');
+      if (!tab) return false;
+      tab.click();
+      return document.querySelectorAll('#emojiGrid button').length > 0;
+    }, { timeout: 10_000 });
+
+    // open picker and click 7TV tab
+    await page.locator('#emojiToggle').click();
+    await page.locator('#emojiTabs button', { hasText: '7TV' }).click();
+
+    // grid should have emote images
+    const firstEmote = page.locator('#emojiGrid button').first();
+    await expect(firstEmote).toBeVisible();
+    const emoteCode = await firstEmote.getAttribute('title');
+    expect(emoteCode).toBeTruthy();
+    await expect(firstEmote.locator('img')).toBeVisible();
+
+    // click it — code appears in composer
+    await firstEmote.click();
+    const composerValue = await page.locator('#composer').inputValue();
+    expect(composerValue).toContain(emoteCode);
+
+    // send and verify it renders as an <img> in chat
+    await page.locator('#composer').press('Enter');
+    const lastMsg = page.locator('#messages .group').last();
+    const emoteImg = lastMsg.locator(`img[alt="${emoteCode}"]`);
+    await expect(emoteImg).toBeVisible({ timeout: 5_000 });
+    const src = await emoteImg.getAttribute('src');
+    expect(src).toContain('7tv.app');
+  });
+});
+
 test.describe('P2P chat between two users', () => {
   test('two users can exchange messages', async ({ browser }) => {
     const contextA = await browser.newContext();
