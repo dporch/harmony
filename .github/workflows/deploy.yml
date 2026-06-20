@@ -34,7 +34,9 @@ jobs:
         run: npx playwright install --with-deps chromium firefox
 
       - name: Start PulseAudio
-        run: pulseaudio --start
+        run: |
+          sudo apt-get install -y pulseaudio
+          pulseaudio --start
 
       - name: Run tests
         run: npx playwright test
