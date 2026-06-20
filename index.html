@@ -230,9 +230,9 @@
           ? `<img src="${escapeHtml(room.image)}" class="w-8 h-8 rounded-lg object-cover" alt="" />`
           : `<div class="w-8 h-8 rounded-lg bg-gradient-to-br ${grad} grid place-items-center text-xs font-bold text-white">${ini}</div>`;
         const labelCls = room.name ? 'text-sm font-semibold text-white truncate' : 'text-sm font-semibold text-white font-mono';
-        const subtitle = room.name ? `${short}… · ${ago}` : ago;
+        const subtitle = room.name ? `${escapeHtml(short)}… · ${ago}` : ago;
         list.insertAdjacentHTML('beforeend', `
-          <a href="room.html#${room.id}" class="flex items-center justify-between bg-base-900/60 hover:bg-base-850 ring-soft rounded-xl px-4 py-3 transition group">
+          <a href="room.html#${escapeHtml(room.id)}" class="flex items-center justify-between bg-base-900/60 hover:bg-base-850 ring-soft rounded-xl px-4 py-3 transition group">
             <div class="flex items-center gap-3 min-w-0">
               ${iconHtml}
               <div class="min-w-0">

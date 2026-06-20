@@ -44,7 +44,7 @@ export function initials(name) {
 }
 
 export function escapeHtml(s) {
-  return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 export function now() {
@@ -62,10 +62,12 @@ export function isImageUrl(text) {
 }
 
 export function cropImageFile(file, size = 96) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file'));
     reader.onload = () => {
       const img = new Image();
+      img.onerror = () => reject(new Error('Failed to load image'));
       img.onload = () => {
         const c = document.createElement('canvas');
         c.width = c.height = size;

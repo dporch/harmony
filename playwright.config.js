@@ -35,6 +35,7 @@ export default defineConfig({
             'media.navigator.streams.fake': true,
             'media.navigator.permission.disabled': true,
             'media.autoplay.default': 0,
+            'media.volume_scale': '0.0',
             'dom.events.testing.asyncClipboard': true,
           },
         },
