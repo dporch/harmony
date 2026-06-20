@@ -39,7 +39,7 @@ jobs:
           pulseaudio --start
 
       - name: Run tests
-        run: npx playwright test
+        run: npx playwright test --reporter=html
 
       - name: Upload test results
         if: ${{ !cancelled() }}
