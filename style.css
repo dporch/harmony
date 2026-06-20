@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --color-base-950: #0b0c10;
+  --color-base-900: #111319;
+  --color-base-850: #171a22;
+  --color-base-800: #1d212b;
+  --color-base-700: #2a2f3d;
+  --color-brand: #7c6cff;
+  --color-brand-600: #6a5af0;
+  --color-brand-400: #9d90ff;
+  --color-accent: #41d6a3;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+.glow {
+  box-shadow: 0 0 0 1px rgba(124, 108, 255, 0.25),
+    0 20px 60px -20px rgba(124, 108, 255, 0.45);
+}
+
+.ring-soft {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.speaking {
+  box-shadow: 0 0 0 2px #41d6a3, 0 0 14px -2px #41d6a3;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #22273a;
+  border-radius: 9px;
+  border: 3px solid #0b0c10;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #41d6a3;
+  animation: pulse-ring 1.4s ease-out infinite;
+}

@@ -4,15 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Harmony is a peer-to-peer chat and voice web app. No build step, no framework — static HTML/JS served from GitHub Pages. Trystero (v0.18, Firebase strategy) handles WebRTC signaling via Firebase Realtime Database; after the handshake, all chat/voice flows directly browser-to-browser over encrypted WebRTC.
+Harmony is a peer-to-peer chat and voice web app. Vite bundles the HTML/JS/CSS; Tailwind v4 (via `@tailwindcss/vite`) generates styles at build time. Trystero (v0.18, Firebase strategy) handles WebRTC signaling via Firebase Realtime Database; after the handshake, all chat/voice flows directly browser-to-browser over encrypted WebRTC. Deployed to GitHub Pages via GitHub Actions (build → test → deploy).
 
 ## Commands
 
 ```bash
-# Serve locally (no build step)
-python3 -m http.server 8000
+# Dev server (hot reload)
+npm run dev
 
-# Run all tests (Chromium + Firefox)
+# Production build → dist/
+npm run build
+
+# Preview production build locally
+npm run preview
+
+# Run all tests (Chromium + Firefox) — builds first, then tests against dist/
 npx playwright test
 
 # Run a single test by name
@@ -25,19 +31,23 @@ npx playwright test --project=firefox
 
 ## Architecture
 
-Three source files, all served as static assets:
+Source files in project root, bundled by Vite into `dist/`:
 
-- **`index.html`** — Landing page. Create/join rooms, pick username+avatar. Stores identity in localStorage.
+- **`index.html`** — Landing page. Create/join rooms, pick username+avatar. Stores identity in localStorage. Inline `<script type="module">` is extracted and bundled by Vite.
 - **`room.html`** — The chat room. Contains all room logic inline in a `<script type="module">`: Trystero room join, presence/chat/voice actions, peer list rendering, emoji picker (native + BetterTTV/7TV), mic pipeline (gain → reverb → WebRTC).
-- **`shared.js`** — Shared module imported by both pages: constants (Firebase URL, RTC config, gradients), utility functions (`escapeHtml`, `initials`, `isImageUrl`, `cropImageFile`), localStorage accessors, and the settings modal component (`initSettingsModal`).
+- **`shared.js`** — Shared module imported by both pages: constants (Firebase URL, RTC config, gradients), utility functions (`escapeHtml`, `initials`, `isImageUrl`, `cropImageFile`), localStorage accessors, and the settings modal component (`initSettingsModal`). Vite creates a shared chunk for this.
+- **`style.css`** — Tailwind v4 entry point (`@import "tailwindcss"`) with `@theme` block defining custom colors (`base-*`, `brand`, `accent`) and Inter font. Also contains shared custom CSS.
+- **`vite.config.js`** — Multi-page Vite config with `@tailwindcss/vite` plugin.
 
 Trystero actions (P2P message channels): `pres` (presence), `chat` (messages), `mute` (mic state), `meta` (room name/image).
 
-Tailwind CSS is loaded from CDN with an inline config block duplicated in both HTML files (same color tokens: `base-*`, `brand`, `accent`).
+Trystero + Firebase are bundled from npm (not loaded from CDN). Google Fonts (Inter) remains a CDN link.
 
 ## Testing
 
 Playwright e2e tests in `tests/harmony.spec.js` run against both Chromium and Firefox (10 parallel workers). Tests use `tests/base.js` which extends Playwright's `test` fixture to gracefully skip unsupported Firefox permissions (microphone, clipboard).
+
+The Playwright `webServer` config runs `npm run build` then serves `dist/` with Python's http.server on port 4173.
 
 Chromium uses `--use-fake-device-for-media-stream` for synthetic audio; Firefox uses `media.navigator.streams.fake`. Firefox audio output is muted via `media.volume_scale: '0.0'`.
 
@@ -45,4 +55,4 @@ Chromium uses `--use-fake-device-for-media-stream` for synthetic audio; Firefox 
 
 - **All HTML rendering uses `insertAdjacentHTML`/`innerHTML`** — every piece of untrusted data (peer names, avatars, room IDs, peer IDs) must go through `escapeHtml()` before insertion. Peer-sent data arrives over the network and is fully attacker-controlled.
 - **Mic pipeline**: raw mic → GainNode (volume) → dry path + ConvolverNode (reverb) wet path → MediaStreamDestination → sent to peers via `room.addStream()`. A single shared AudioContext drives all speaking-level meters.
-- **No build step**: all imports are either ESM from `esm.sh` CDN (Trystero, Firebase) or relative (`./shared.js`). No bundler, no transpiler.
+- **Inline scripts stay inline**: both HTML files keep their `<script type="module">` blocks. Vite extracts and bundles these during build.
