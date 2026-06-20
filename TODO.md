@@ -4,8 +4,8 @@
 - [x] Verify favicon 404 is gone once Pages redeploys
 
 ## Nice-to-haves / future
-- [ ] Custom emojis — Twitch / BetterTTV emotes in chat (fetch emote sets,
-      render in messages + the picker)
+- [x] Custom emojis — BetterTTV + 7TV global emotes in picker tabs,
+      rendered as inline images in chat, cached in localStorage (24h TTL)
 - [x] Self speaking indicator — your own avatar circle lights up when you talk
       (meter your own mic; today only peers' circles light up)
 - [ ] Request mic permission on room join — prompt up front instead of waiting
