@@ -14,7 +14,7 @@
       mirroring the in-room settings
 - [ ] TURN server for restrictive NATs (Cloudflare TURN) — voice/data can fail
       behind symmetric NATs with STUN only; also the only way to hide peer IPs
-- [ ] Cross-browser test run (currently chromium only in playwright.config.js)
+- [x] Cross-browser test run — Chromium + Firefox (headless) in playwright.config.js
 - [x] Signaling reliability — moved MQTT → Nostr → Firebase Realtime Database
       (own backend, scoped to the `__trystero__` subtree). Fast, no dead-relay
       flakes. Anonymous auth was evaluated and skipped (fights the no-build CDN

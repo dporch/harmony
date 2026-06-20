@@ -19,13 +19,24 @@ export default defineConfig({
         browserName: 'chromium',
         launchOptions: {
           args: [
-            // synthesize a fake mic (a tone) so getUserMedia works headless
             '--use-fake-device-for-media-stream',
-            // auto-accept the mic permission prompt
             '--use-fake-ui-for-media-stream',
-            // let the received audio + AudioContext start without a user gesture
             '--autoplay-policy=no-user-gesture-required',
           ],
+        },
+      },
+    },
+    {
+      name: 'firefox',
+      use: {
+        browserName: 'firefox',
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+            'media.autoplay.default': 0,
+            'dom.events.testing.asyncClipboard': true,
+          },
         },
       },
     },

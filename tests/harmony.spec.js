@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './base.js';
 import path from 'path';
 
 const AVATAR_PATH = path.join(import.meta.dirname, 'fixtures', 'avatar.png');
@@ -718,7 +718,8 @@ test.describe('Copy invite link', () => {
 });
 
 test.describe('Mic swap mid-call', () => {
-  test('swapping mic device in settings keeps audio flowing', async ({ browser }) => {
+  test('swapping mic device in settings keeps audio flowing', async ({ browser, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox fake device does not expose multiple devices');
     test.setTimeout(120_000);
 
     const contextA = await browser.newContext({ permissions: ['microphone'] });
