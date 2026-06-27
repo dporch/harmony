@@ -7,6 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "playwright test",
+    "test:prod": "BASE_URL=https://dporch.github.io/harmony/ playwright test",
     "test:ui": "playwright test --ui"
   },
   "dependencies": {

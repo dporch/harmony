@@ -75,6 +75,7 @@ jobs:
     needs: deploy
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
 
@@ -108,7 +109,7 @@ jobs:
           exit 1
 
       - name: Run tests against live site
-        run: npx playwright test --reporter=html
+        run: npx playwright test --reporter=list,html
         env:
           BASE_URL: https://dporch.github.io/harmony/
 
