@@ -135,7 +135,7 @@
   <div id="audioContainer" class="hidden"></div>
 
   <script type="module">
-    import { joinRoom, selfId } from 'trystero/firebase';
+    import { joinRoom, selfId } from '@trystero-p2p/firebase';
     import {
       APP_ID, RTC_CONFIG, FIREBASE_DB_URL, gradientFor, initials, escapeHtml, now, isImageUrl,
       cropImageFile,
@@ -192,32 +192,28 @@
       roomId,
     );
 
-    // v0.18 API: makeAction returns [send, setOnComplete, setOnProgress]
-    const [sendPresence, onPresence] = room.makeAction('pres');
-    const [sendChat, onChat] = room.makeAction('chat');
-    const [sendMuteState, onMuteState] = room.makeAction('mute');
-    const [sendMeta, onMeta] = room.makeAction('meta');
+    const presAction = room.makeAction('pres');
+    const chatAction = room.makeAction('chat');
+    const muteAction = room.makeAction('mute');
+    const metaAction = room.makeAction('meta');
 
-    // adopt the room name/image whoever already has it shares
-    onMeta(data => {
+    metaAction.onMessage = (data) => {
       if (!data || (!data.name && !data.image)) return;
       applyRoomMeta(data);
       setRoomMeta(roomId, roomMeta);
-    });
+    };
 
     // ── presence ──
-    room.onPeerJoin(peerId => {
+    room.onPeerJoin = peerId => {
       peers.set(peerId, { name: peerId.slice(0, 6), avatar: '', muted: false, inVoice: false });
-      sendPresence({ name: myName, avatar: myAvatar, inVoice, muted }, peerId);
-      if (roomMeta.name || roomMeta.image) sendMeta(roomMeta, peerId);
-      // streams only reach peers present when addStream was called, so
-      // re-send our mic to anyone who joins after we're already in voice
-      if (inVoice && micStream) room.addStream(micStream, peerId);
+      presAction.send({ name: myName, avatar: myAvatar, inVoice, muted }, { target: peerId });
+      if (roomMeta.name || roomMeta.image) metaAction.send(roomMeta, { target: peerId });
+      if (inVoice && micStream) room.addStream(micStream, { target: peerId });
       renderPeers();
       addSystemMessage(`${peerId.slice(0, 6)} joined`, peerId);
-    });
+    };
 
-    onPresence(handlePresence);
+    presAction.onMessage = (data, { peerId }) => handlePresence(data, peerId);
     function handlePresence(data, peerId) {
       const peer = peers.get(peerId) || { muted: false, inVoice: false };
       peer.name = data.name || peerId.slice(0, 6);
@@ -230,7 +226,7 @@
       if (sysEl) sysEl.textContent = `${peer.name} joined`;
     }
 
-    room.onPeerLeave(peerId => {
+    room.onPeerLeave = peerId => {
       const peer = peers.get(peerId);
       const name = peer?.name || peerId.slice(0, 6);
       peers.delete(peerId);
@@ -239,22 +235,22 @@
       if (audio) audio.remove();
       renderPeers();
       addSystemMessage(`${name} left`);
-    });
+    };
 
     // ── chat ──
-    onChat((data, peerId) => {
+    chatAction.onMessage = (data, { peerId }) => {
       const peer = peers.get(peerId);
       const name = peer?.name || peerId.slice(0, 6);
       const avatar = peer?.avatar || '';
       const grad = gradientFor(peerId);
       addChatMessage({ user: name, avatar, gradient: grad, text: data.text, time: now() });
-    });
+    };
 
     // ── mute state ──
-    onMuteState((data, peerId) => {
+    muteAction.onMessage = (data, { peerId }) => {
       const peer = peers.get(peerId);
       if (peer) { peer.muted = data.muted; renderPeers(); }
-    });
+    };
 
 
     // ── voice ──
@@ -309,7 +305,7 @@
       document.addEventListener('click', resume);
     }
 
-    room.onPeerStream((stream, peerId) => {
+    room.onPeerStream = (stream, peerId) => {
       const peer = peers.get(peerId);
       if (peer) peer.inVoice = true;
 
@@ -326,7 +322,7 @@
 
       startMeter(peerId, stream);
       renderPeers();
-    });
+    };
 
     // ── DOM references ──
     const msgBox = document.getElementById('messages');
@@ -447,7 +443,7 @@
       const input = document.getElementById('composer');
       const text = input.value.trim();
       if (!text) return;
-      sendChat({ text });
+      chatAction.send({ text });
       addChatMessage({ user: myName, avatar: myAvatar, gradient: 'from-brand to-accent', text, time: now() });
       input.value = '';
       refreshSend();
@@ -544,7 +540,7 @@
       micStream.getAudioTracks().forEach(t => t.enabled = !muted);
       inVoice = true;
       room.addStream(micStream);
-      sendPresence({ name: myName, avatar: myAvatar, inVoice: true, muted });
+      presAction.send({ name: myName, avatar: myAvatar, inVoice: true, muted });
       document.getElementById('voiceJoinPanel').classList.add('hidden');
       document.getElementById('voiceActivePanel').classList.remove('hidden');
       renderPeers();
@@ -558,7 +554,7 @@
       document.getElementById('micBtnLabel').textContent = muted ? 'Unmute' : 'Mute';
       document.getElementById('micBtnIcon').innerHTML = muted ? MIC_MUTED_PATH : MIC_ON_PATH;
       document.getElementById('micBtn').classList.toggle('bg-rose-500/20', muted);
-      sendMuteState({ muted });
+      muteAction.send({ muted });
       renderPeers();
     };
 
@@ -573,7 +569,7 @@
       micPipeline = null;
       inVoice = false;
       muted = false;
-      sendPresence({ name: myName, avatar: myAvatar, inVoice: false, muted: false });
+      presAction.send({ name: myName, avatar: myAvatar, inVoice: false, muted: false });
       document.getElementById('micBtnLabel').textContent = 'Mute';
       document.getElementById('micBtnIcon').innerHTML = MIC_ON_PATH;
       document.getElementById('micBtn').classList.remove('bg-rose-500/20');
@@ -656,7 +652,7 @@
           }
         }
 
-        sendPresence({ name: myName, avatar: myAvatar, inVoice, muted });
+        presAction.send({ name: myName, avatar: myAvatar, inVoice, muted });
         renderPeers();
       },
     });

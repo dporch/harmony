@@ -11,10 +11,10 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
-    "trystero": "^0.18.0"
+    "@trystero-p2p/firebase": "^0.25.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4",
     "tailwindcss": "^4",
     "vite": "^6"

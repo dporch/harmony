@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Harmony is a peer-to-peer chat and voice web app. Vite bundles the HTML/JS/CSS; Tailwind v4 (via `@tailwindcss/vite`) generates styles at build time. Trystero (v0.18, Firebase strategy) handles WebRTC signaling via Firebase Realtime Database; after the handshake, all chat/voice flows directly browser-to-browser over encrypted WebRTC. Deployed to GitHub Pages via GitHub Actions (build → test → deploy).
+Harmony is a peer-to-peer chat and voice web app. Vite bundles the HTML/JS/CSS; Tailwind v4 (via `@tailwindcss/vite`) generates styles at build time. Trystero (v0.25, `@trystero-p2p/firebase`) handles WebRTC signaling via Firebase Realtime Database; after the handshake, all chat/voice flows directly browser-to-browser over encrypted WebRTC. Deployed to GitHub Pages via GitHub Actions (build → test → deploy → post-deploy test).
 
 ## Commands
 
@@ -18,7 +18,7 @@ npm run build
 # Preview production build locally
 npm run preview
 
-# Run all tests (Chromium + Firefox) — builds first, then tests against dist/
+# Run all tests (Chromium + Firefox, 16 workers) — builds first, then tests against dist/
 npx playwright test
 
 # Run a single test by name
@@ -27,6 +27,9 @@ npx playwright test -g "sends a message"
 # Run one browser only
 npx playwright test --project=chromium
 npx playwright test --project=firefox
+
+# Run full suite against live production site
+npm run test:prod
 ```
 
 ## Architecture
@@ -39,15 +42,17 @@ Source files in project root, bundled by Vite into `dist/`:
 - **`style.css`** — Tailwind v4 entry point (`@import "tailwindcss"`) with `@theme` block defining custom colors (`base-*`, `brand`, `accent`) and Inter font. Also contains shared custom CSS.
 - **`vite.config.js`** — Multi-page Vite config with `@tailwindcss/vite` plugin.
 
-Trystero actions (P2P message channels): `pres` (presence), `chat` (messages), `mute` (mic state), `meta` (room name/image).
+Trystero actions (P2P message channels): `pres` (presence), `chat` (messages), `mute` (mic state), `meta` (room name/image). v0.25 API uses `room.makeAction('name')` returning `{ send, onMessage }` objects, and property-assignment event handlers (`room.onPeerJoin = cb`).
 
-Trystero + Firebase are bundled from npm (not loaded from CDN). Google Fonts (Inter) remains a CDN link.
+`@trystero-p2p/firebase` + Firebase are bundled from npm (not loaded from CDN). Google Fonts (Inter) remains a CDN link.
 
 ## Testing
 
-Playwright e2e tests in `tests/harmony.spec.js` run against both Chromium and Firefox (10 parallel workers). Tests use `tests/base.js` which extends Playwright's `test` fixture to gracefully skip unsupported Firefox permissions (microphone, clipboard).
+Playwright e2e tests in `tests/harmony.spec.js` run against both Chromium and Firefox (16 parallel workers). Tests use `tests/base.js` which extends Playwright's `test` fixture to gracefully skip unsupported Firefox permissions (microphone, clipboard).
 
-The Playwright `webServer` config runs `npm run build` then serves `dist/` with Python's http.server on port 4173.
+For local runs, the Playwright `webServer` config runs `npm run build` then serves `dist/` with Python's http.server on port 4173. Set `BASE_URL` env var to skip the local server and test against an external URL (e.g. `npm run test:prod` tests against the live GitHub Pages site).
+
+CI runs the full suite locally before deploy, then again against the live site after deploy. The post-deploy job polls a `version.json` file (containing the commit SHA) to confirm the new build is live before testing.
 
 Chromium uses `--use-fake-device-for-media-stream` for synthetic audio; Firefox uses `media.navigator.streams.fake`. Firefox audio output is muted via `media.volume_scale: '0.0'`.
 
