@@ -30,9 +30,6 @@ jobs:
 
       - run: npm run build
 
-      - name: Write version file
-        run: echo "{\"sha\":\"$GITHUB_SHA\"}" > dist/version.json
-
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox
 
@@ -51,6 +48,10 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+      - name: Write version file
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: echo "{\"sha\":\"$GITHUB_SHA\"}" > dist/version.json
 
       - name: Upload Pages artifact
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
