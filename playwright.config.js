@@ -9,7 +9,7 @@ export default defineConfig({
   retries: 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: process.env.BASE_URL || 'http://localhost:4173',
     trace: 'on-first-retry',
   },
   projects: [
@@ -42,9 +42,11 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'npm run build && python3 -m http.server 4173 --directory dist',
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-  },
+  ...(!process.env.BASE_URL && {
+    webServer: {
+      command: 'npm run build && python3 -m http.server 4173 --directory dist',
+      port: 4173,
+      reuseExistingServer: !process.env.CI,
+    },
+  }),
 });

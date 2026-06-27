@@ -30,6 +30,9 @@ jobs:
 
       - run: npm run build
 
+      - name: Write version file
+        run: echo "{\"sha\":\"$GITHUB_SHA\"}" > dist/version.json
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox
 
@@ -66,3 +69,52 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  post-deploy-test:
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Start PulseAudio
+        run: |
+          sudo apt-get install -y pulseaudio
+          pulseaudio --start
+
+      - name: Wait for new version to be live
+        run: |
+          for i in $(seq 1 30); do
+            LIVE_SHA=$(curl -sf https://dporch.github.io/harmony/version.json | jq -r .sha) || true
+            if [ "$LIVE_SHA" = "$GITHUB_SHA" ]; then
+              echo "New version is live after ${i} attempts"
+              exit 0
+            fi
+            echo "Attempt ${i}: expected $GITHUB_SHA, got ${LIVE_SHA:-none}"
+            sleep 10
+          done
+          echo "Timed out waiting for deploy to propagate"
+          exit 1
+
+      - name: Run tests against live site
+        run: npx playwright test --reporter=html
+        env:
+          BASE_URL: https://dporch.github.io/harmony/
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: post-deploy-report
+          path: playwright-report/
+          retention-days: 7
